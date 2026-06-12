@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { backupCreate } from "../lib/api";
+import { notify } from "../lib/feedback";
 import OverviewDashboard from "./views/OverviewDashboard.vue";
 import DonationsView from "./views/DonationsView.vue";
 import ExpensesView from "./views/ExpensesView.vue";
@@ -50,14 +51,6 @@ const title = computed(() => {
   }
 });
 
-const toast = ref<string | null>(null);
-let toastTimeout: any = null;
-function showToast(message: string) {
-  toast.value = message;
-  clearTimeout(toastTimeout);
-  toastTimeout = setTimeout(() => (toast.value = null), 2500);
-}
-
 onMounted(() => {
   const savedTab = localStorage.getItem(NAV_TAB_KEY);
   const savedProjectId = localStorage.getItem(NAV_PROJECT_KEY);
@@ -70,7 +63,7 @@ onMounted(() => {
   if (tab.value === "project_detail" && selectedProjectId.value == null) {
     tab.value = "projects";
   }
-  showToast("Unlocked");
+  notify("Unlocked");
 });
 
 watch(
@@ -96,13 +89,13 @@ watch(
 
 async function quickBackup() {
   const path = await backupCreate(props.sessionToken);
-  showToast(`Backup created: ${path}`);
+  notify(`Backup created: ${path}`);
 }
 </script>
 
 <template>
-  <div class="min-h-screen flex">
-    <aside class="w-64 shrink-0 border-r border-slate-800 bg-slate-950/40 p-4">
+  <div class="h-full flex overflow-hidden">
+    <aside class="w-64 shrink-0 border-r border-slate-800 bg-slate-950/40 p-4 overflow-y-auto">
       <div class="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
         <div class="text-sm text-slate-400">Project Funds Tracker</div>
         <div class="mt-1 font-semibold">Church Ledger</div>
@@ -168,7 +161,7 @@ async function quickBackup() {
       </nav>
     </aside>
 
-    <main class="flex-1 p-6">
+    <main class="flex-1 min-w-0 p-6 overflow-y-auto">
       <header class="flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-bold">{{ title }}</h1>
@@ -201,11 +194,5 @@ async function quickBackup() {
       </div>
     </main>
 
-    <div
-      v-if="toast"
-      class="fixed bottom-5 right-5 rounded-xl border border-slate-700 bg-slate-900/90 px-4 py-3 text-sm text-slate-200 shadow-2xl"
-    >
-      {{ toast }}
-    </div>
   </div>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { projectBalances, projectsCreate, projectsDelete, projectsList } from "../../lib/api";
+import { notify } from "../../lib/feedback";
 import { centsFromPesos, formatPHPFromCents } from "../../lib/money";
 import type { Project, ProjectBalanceRow } from "../../lib/types";
 
@@ -45,6 +46,8 @@ function remainingToTargetForProject(project: Project): number {
 
 async function createProject() {
   errorMessage.value = null;
+  const name = formName.value.trim();
+  if (!confirm(`Save project "${name}"?`)) return;
   try {
     await projectsCreate(props.sessionToken, {
       name: formName.value,
@@ -59,6 +62,7 @@ async function createProject() {
     formDescription.value = "";
     showAddProject.value = false;
     await load();
+    notify(`Project "${name}" saved.`);
   } catch (e: any) {
     errorMessage.value = String(e);
   }
@@ -69,6 +73,7 @@ async function removeProject(id: number) {
   try {
     await projectsDelete(props.sessionToken, id);
     await load();
+    notify("Project deleted.");
   } catch (e: any) {
     errorMessage.value = String(e);
   }

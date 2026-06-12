@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { resetAdminPassword } from "../lib/api";
 
 const emit = defineEmits<{
   (e: "login", password: string): void;
+  (e: "reset-password"): void;
 }>();
 
 const password = ref("");
 const submitting = ref(false);
 const errorMessage = ref<string | null>(null);
+const resetConfirm = ref("");
+const resetting = ref(false);
 
 async function handleLogin() {
   errorMessage.value = null;
@@ -20,20 +24,36 @@ async function handleLogin() {
     submitting.value = false;
   }
 }
+
+async function handleReset() {
+  errorMessage.value = null;
+  if (resetConfirm.value.trim().toUpperCase() !== "RESET") {
+    errorMessage.value = 'Type RESET to confirm password reset.';
+    return;
+  }
+
+  resetting.value = true;
+  try {
+    await resetAdminPassword();
+    emit("reset-password");
+    resetConfirm.value = "";
+  } catch (e: any) {
+    errorMessage.value = String(e);
+  } finally {
+    resetting.value = false;
+  }
+}
 </script>
 
 <template>
   <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4">
-    <!-- Decorative Background Elements -->
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
       <div class="absolute top-1/4 -left-32 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl"></div>
       <div class="absolute bottom-1/4 -right-32 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl"></div>
     </div>
 
-    <!-- Login Card -->
     <div class="relative w-full max-w-md">
       <div class="bg-slate-800/80 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-8">
-        <!-- Header -->
         <div class="text-center mb-8">
           <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-emerald-500 rounded-xl mb-4">
             <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -44,9 +64,7 @@ async function handleLogin() {
           <p class="text-slate-400 text-sm">Enter your password to unlock the ledger</p>
         </div>
 
-        <!-- Login Form -->
         <form @submit.prevent="handleLogin" class="space-y-5">
-          <!-- Password Field -->
           <div>
             <label for="password" class="block text-sm font-medium text-slate-300 mb-2">Password</label>
             <div class="relative">
@@ -73,15 +91,46 @@ async function handleLogin() {
             {{ errorMessage }}
           </div>
 
-          <!-- Login Button -->
           <button
             type="submit"
             :disabled="submitting"
             class="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
           >
-            {{ submitting ? "Unlocking…" : "Unlock" }}
+            {{ submitting ? "Unlocking..." : "Unlock" }}
           </button>
         </form>
+
+        <div class="mt-8 border-t border-slate-700/60 pt-6">
+          <div class="text-sm font-semibold text-slate-200">Forgot password?</div>
+          <p class="mt-1 text-xs text-slate-400">
+            This clears the current admin password only. Your data stays intact.
+          </p>
+
+          <div class="mt-4 space-y-3">
+            <div>
+              <label for="resetConfirm" class="block text-xs font-medium text-slate-300 mb-2">
+                Type RESET to confirm
+              </label>
+              <input
+                v-model="resetConfirm"
+                id="resetConfirm"
+                type="text"
+                autocomplete="off"
+                placeholder="RESET"
+                class="w-full bg-slate-900/50 border border-slate-600 rounded-xl py-3 px-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all uppercase"
+              />
+            </div>
+
+            <button
+              type="button"
+              :disabled="resetting"
+              class="w-full rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-200 font-semibold py-3 px-4 hover:bg-rose-500/20 disabled:opacity-60 transition-all duration-200"
+              @click="handleReset"
+            >
+              {{ resetting ? "Resetting..." : "Reset admin password" }}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>

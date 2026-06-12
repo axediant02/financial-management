@@ -26,6 +26,11 @@ impl SessionStore {
         guard.remove(token);
     }
 
+    pub fn clear(&self) {
+        let mut guard = self.sessions.lock().expect("sessions lock poisoned");
+        guard.clear();
+    }
+
     pub fn is_valid(&self, token: &str) -> bool {
         let mut guard = self.sessions.lock().expect("sessions lock poisoned");
         let now = Instant::now();

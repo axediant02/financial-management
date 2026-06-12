@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { save } from "@tauri-apps/plugin-dialog";
 import { exportCsv, exportPdf, ledgerSummary, projectBalances, projectsList } from "../../lib/api";
+import { notify } from "../../lib/feedback";
 import { formatPHPFromCents } from "../../lib/money";
 import type { LedgerSummary, Project, ProjectBalanceRow } from "../../lib/types";
 
@@ -44,6 +45,7 @@ async function exportDonationsCsv() {
   });
   if (!dest) return;
   await exportCsv(props.sessionToken, { kind: "donations", filter: activeFilter.value, dest_path: dest });
+  notify("Contributions CSV exported.");
 }
 
 async function exportExpensesCsv() {
@@ -53,6 +55,7 @@ async function exportExpensesCsv() {
   });
   if (!dest) return;
   await exportCsv(props.sessionToken, { kind: "expenses", filter: activeFilter.value, dest_path: dest });
+  notify("Expenses CSV exported.");
 }
 
 async function exportProjectsCsv() {
@@ -62,6 +65,7 @@ async function exportProjectsCsv() {
   });
   if (!dest) return;
   await exportCsv(props.sessionToken, { kind: "projects", filter: activeFilter.value, dest_path: dest });
+  notify("Projects CSV exported.");
 }
 
 async function exportSummaryPdf() {
@@ -71,6 +75,7 @@ async function exportSummaryPdf() {
   });
   if (!dest) return;
   await exportPdf(props.sessionToken, { title: "Project Funds Tracker — Summary", filter: activeFilter.value, dest_path: dest });
+  notify("PDF summary exported.");
 }
 
 onMounted(load);

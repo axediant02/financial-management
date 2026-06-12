@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { categoriesCreate, categoriesList, expensesCreate, expensesDelete, expensesList, projectsList } from "../../lib/api";
+import { notify } from "../../lib/feedback";
 import { centsFromPesos, formatPHPFromCents } from "../../lib/money";
 import type { Category, Expense, Project } from "../../lib/types";
 
@@ -47,6 +48,7 @@ async function load() {
 
 async function createExpense() {
   errorMessage.value = null;
+  if (!confirm("Save this expense record?")) return;
   try {
     const amountCents = centsFromPesos(formAmount.value);
     await expensesCreate(props.sessionToken, {
@@ -61,6 +63,7 @@ async function createExpense() {
     formPayee.value = "";
     formNotes.value = "";
     await load();
+    notify("Expense saved.");
   } catch (e: any) {
     errorMessage.value = String(e);
   }
@@ -70,10 +73,12 @@ async function addCategory() {
   errorMessage.value = null;
   const name = newCategoryName.value.trim();
   if (!name) return;
+  if (!confirm(`Add category "${name}"?`)) return;
   try {
     await categoriesCreate(props.sessionToken, { name });
     newCategoryName.value = "";
     await load();
+    notify(`Category "${name}" added.`);
   } catch (e: any) {
     errorMessage.value = String(e);
   }
@@ -84,6 +89,7 @@ async function removeExpense(id: number) {
   try {
     await expensesDelete(props.sessionToken, id);
     await load();
+    notify("Expense deleted.");
   } catch (e: any) {
     errorMessage.value = String(e);
   }

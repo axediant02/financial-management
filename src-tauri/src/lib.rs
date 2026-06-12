@@ -33,6 +33,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::app_status,
             commands::bootstrap_admin,
+            commands::reset_admin_password,
             commands::login,
             commands::logout,
             commands::donors_list,

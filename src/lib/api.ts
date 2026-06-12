@@ -44,6 +44,10 @@ export async function bootstrapAdmin(password: string): Promise<void> {
   await invoke("bootstrap_admin", { password });
 }
 
+export async function resetAdminPassword(): Promise<void> {
+  await invoke("reset_admin_password");
+}
+
 export async function login(password: string): Promise<AuthResult> {
   return await invoke("login", { password });
 }

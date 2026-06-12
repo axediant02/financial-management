@@ -50,6 +50,17 @@ pub fn bootstrap_admin(password: String, state: State<'_, AppState>) -> Result<(
 }
 
 #[tauri::command]
+pub fn reset_admin_password(state: State<'_, AppState>) -> Result<(), String> {
+    with_conn(&state, |conn| {
+        conn.execute("DELETE FROM admins", [])?;
+        Ok(())
+    })
+    .map_err(map_err)?;
+    state.sessions.clear();
+    Ok(())
+}
+
+#[tauri::command]
 pub fn login(password: String, state: State<'_, AppState>) -> Result<AuthResult, String> {
     with_conn(&state, |conn| auth::verify_admin_password(conn, &password)).map_err(map_err)?;
     Ok(AuthResult {

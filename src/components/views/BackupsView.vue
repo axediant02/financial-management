@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { open } from "@tauri-apps/plugin-dialog";
 import { backupCreate, backupList, backupRestore } from "../../lib/api";
+import { notify } from "../../lib/feedback";
 import type { BackupInfo } from "../../lib/types";
 
 const props = defineProps<{ sessionToken: string }>();
@@ -24,9 +25,11 @@ async function load() {
 
 async function create() {
   errorMessage.value = null;
+  if (!confirm("Create a new backup now?")) return;
   try {
     await backupCreate(props.sessionToken);
     await load();
+    notify("Backup created.");
   } catch (e: any) {
     errorMessage.value = String(e);
   }
@@ -40,10 +43,11 @@ async function restore() {
     filters: [{ name: "SQLite Backup", extensions: ["sqlite3", "db"] }],
   });
   if (!path) return;
+  if (!confirm("Restore this backup? The current database will be replaced.")) return;
   try {
     await backupRestore(props.sessionToken, String(path));
     await load();
-    alert("Restore complete. The app will now use the restored database.");
+    notify("Restore complete. The app is using the restored database.");
   } catch (e: any) {
     errorMessage.value = String(e);
   }
