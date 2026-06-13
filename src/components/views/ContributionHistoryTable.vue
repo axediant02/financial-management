@@ -48,6 +48,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "page-change", startIndex: number): void;
+  (e: "add-contribution", memberName: string, date: string): void;
+  (e: "add-member"): void;
+  (e: "add-date"): void;
 }>();
 
 const pageSize = 5;
@@ -269,6 +272,30 @@ function isCurrentDay(date: string) {
       <div class="flex flex-wrap items-center gap-2">
         <button
           type="button"
+          class="rounded-[2px] border px-3 py-2 text-sm font-semibold"
+          :class="props.themeMode === 'dark' ? 'border-blue-500 bg-blue-500 text-white hover:bg-blue-400' : 'border-blue-600 bg-blue-600 text-white hover:bg-blue-500'"
+          @click="emit('add-contribution', '', currentDayLabel)"
+        >
+          + Add Contribution
+        </button>
+        <button
+          type="button"
+          class="rounded-[2px] border px-3 py-2 text-sm font-semibold"
+          :class="props.themeMode === 'dark' ? 'border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700' : 'border-slate-300 bg-white text-slate-900 hover:bg-slate-50'"
+          @click="emit('add-member')"
+        >
+          + Add Member
+        </button>
+        <button
+          type="button"
+          class="rounded-[2px] border px-3 py-2 text-sm font-semibold"
+          :class="props.themeMode === 'dark' ? 'border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700' : 'border-slate-300 bg-white text-slate-900 hover:bg-slate-50'"
+          @click="emit('add-date')"
+        >
+          + Add Date
+        </button>
+        <button
+          type="button"
           class="rounded-[2px] border px-3 py-2 text-sm font-semibold transition"
           :class="[
             props.themeMode === 'dark' ? 'border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700' : 'border-slate-300 bg-white text-slate-900 hover:bg-slate-50',
@@ -360,9 +387,23 @@ function isCurrentDay(date: string) {
                 :class="slot.kind === 'date' && isCurrentDay(slot.date) ? (props.themeMode === 'dark' ? 'bg-emerald-950' : 'bg-emerald-50') : ''"
               >
                 <template v-if="slot.kind === 'date'">
-                  <span v-if="getCellAmount(row, slot.date) > 0" class="font-semibold" :class="props.themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900'">
-                    {{ formatMoney(getCellAmount(row, slot.date)) }}
-                  </span>
+                  <button
+                    v-if="row.name !== 'Anonymous'"
+                    type="button"
+                    class="inline-flex min-h-[2rem] items-center justify-center rounded-[2px] px-2 py-1 text-xs font-semibold transition"
+                    :class="getCellAmount(row, slot.date) > 0
+                      ? (props.themeMode === 'dark' ? 'text-slate-100 hover:bg-slate-800/60' : 'text-slate-900 hover:bg-slate-100')
+                      : (props.themeMode === 'dark'
+                        ? 'border border-dashed border-slate-600 text-slate-400 hover:border-slate-400 hover:text-slate-200'
+                        : 'border border-dashed border-slate-300 text-slate-500 hover:border-slate-500 hover:text-slate-700')"
+                    :title="`Add contribution for ${row.name} on ${formatDate(slot.date)}`"
+                    @click="emit('add-contribution', row.name, slot.date)"
+                  >
+                    <span v-if="getCellAmount(row, slot.date) > 0" class="font-semibold">
+                      {{ formatMoney(getCellAmount(row, slot.date)) }}
+                    </span>
+                    <span v-else>-</span>
+                  </button>
                   <span v-else :class="props.themeMode === 'dark' ? 'text-slate-500' : 'text-slate-400'">-</span>
                 </template>
                 <span v-else :class="props.themeMode === 'dark' ? 'text-slate-500' : 'text-slate-400'">-</span>
@@ -413,8 +454,8 @@ function isCurrentDay(date: string) {
 
     <div v-if="showAll" class="fixed inset-0 z-50">
       <div class="absolute inset-0 bg-black/60" @click="hideFullHistory"></div>
-      <div class="absolute inset-0 flex items-center justify-center p-4">
-        <div class="flex h-[90vh] w-full max-w-7xl flex-col overflow-hidden rounded-[2px] border shadow-2xl" :class="shellClass">
+      <div class="absolute inset-0 flex items-center justify-center p-3 md:p-4">
+        <div class="flex h-[92vh] w-[98vw] max-w-[98vw] flex-col overflow-hidden rounded-[2px] border shadow-2xl" :class="shellClass">
           <div class="flex items-start justify-between gap-4 border-b px-4 py-4" :class="headerClass">
             <div>
               <div class="text-lg font-semibold">Full Contribution History</div>
@@ -432,20 +473,20 @@ function isCurrentDay(date: string) {
             </button>
           </div>
 
-          <div class="overflow-auto p-4">
-            <div class="overflow-x-auto">
-              <table class="w-full caption-bottom text-sm">
+          <div class="overflow-auto p-3 md:p-4">
+            <div class="overflow-x-scroll">
+              <table class="w-max min-w-full caption-bottom text-sm">
                 <thead :class="headRowClass">
                   <tr class="border-b" :class="props.themeMode === 'dark' ? 'border-slate-700' : 'border-slate-200'">
-                    <th rowspan="2" class="whitespace-nowrap px-4 py-3 text-left font-semibold uppercase tracking-[0.2em]">Name</th>
+                    <th rowspan="2" class="sticky left-0 z-20 whitespace-nowrap border-r px-4 py-3 text-left font-semibold uppercase tracking-[0.2em]" :class="props.themeMode === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-slate-100'">Name</th>
                     <th :colspan="pageSize" class="whitespace-nowrap px-4 py-3 text-center font-semibold uppercase tracking-[0.2em]">Session Date</th>
-                    <th rowspan="2" class="whitespace-nowrap px-4 py-3 text-right font-semibold uppercase tracking-[0.2em]">Total</th>
+                    <th rowspan="2" class="sticky right-0 z-20 whitespace-nowrap border-l px-4 py-3 text-right font-semibold uppercase tracking-[0.2em]" :class="props.themeMode === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-slate-100'">Total</th>
                   </tr>
                   <tr class="border-b" :class="props.themeMode === 'dark' ? 'border-slate-700' : 'border-slate-200'">
                     <th
                       v-for="date in dates"
                       :key="`full-${date.date}`"
-                      class="min-w-[10rem] px-4 py-3 text-center font-medium"
+                      class="min-w-[10rem] whitespace-nowrap px-4 py-3 text-center font-medium"
                       :class="[
                         props.themeMode === 'dark' ? 'text-slate-300' : 'text-slate-600',
                         isCurrentDay(date.date) ? (props.themeMode === 'dark' ? 'bg-emerald-950 text-emerald-300' : 'bg-emerald-50 text-emerald-800') : '',
@@ -467,7 +508,7 @@ function isCurrentDay(date: string) {
                     class="border-b last:border-b-0"
                     :class="bodyRowClass"
                   >
-                    <th scope="row" class="px-4 py-3 text-left font-medium" :class="props.themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900'">
+                    <th scope="row" class="sticky left-0 z-10 border-r px-4 py-3 text-left font-medium" :class="props.themeMode === 'dark' ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-100 bg-white text-slate-900'">
                       <div class="flex flex-col">
                         <span>{{ row.name }}</span>
                         <span class="text-[11px] uppercase tracking-[0.25em]" :class="props.themeMode === 'dark' ? 'text-slate-500' : 'text-slate-400'">Member</span>
@@ -477,7 +518,7 @@ function isCurrentDay(date: string) {
                       <td
                         v-for="cell in row.cells"
                         :key="`full-${row.id}:${cell.date}`"
-                        class="px-4 py-3 text-center"
+                        class="min-w-[10rem] whitespace-nowrap px-4 py-3 text-center"
                         :class="isCurrentDay(cell.date) ? (props.themeMode === 'dark' ? 'bg-emerald-950' : 'bg-emerald-50') : ''"
                       >
                         <span v-if="cell.amount > 0" class="font-semibold" :class="props.themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900'">
@@ -487,7 +528,7 @@ function isCurrentDay(date: string) {
                       </td>
                     </template>
                     <td v-else class="px-4 py-3 text-center" :class="props.themeMode === 'dark' ? 'text-slate-500' : 'text-slate-400'">-</td>
-                    <td class="px-4 py-3 text-right font-semibold" :class="props.themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900'">
+                    <td class="sticky right-0 z-10 border-l px-4 py-3 text-right font-semibold" :class="props.themeMode === 'dark' ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-100 bg-white text-slate-900'">
                       {{ formatMoney(row.total) }}
                     </td>
                   </tr>
@@ -495,11 +536,11 @@ function isCurrentDay(date: string) {
 
                 <tfoot class="border-t" :class="footerClass">
                   <tr>
-                    <th scope="row" class="px-4 py-3 text-left font-semibold uppercase tracking-[0.2em]" :class="props.themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">Total</th>
+                    <th scope="row" class="sticky left-0 z-20 border-r px-4 py-3 text-left font-semibold uppercase tracking-[0.2em]" :class="props.themeMode === 'dark' ? 'border-slate-700 bg-slate-950 text-slate-300' : 'border-slate-100 bg-slate-50 text-slate-700'">Total</th>
                     <td
                       v-for="date in dates"
                       :key="`full-${date.date}-total`"
-                      class="px-4 py-3 text-center font-semibold"
+                      class="min-w-[10rem] whitespace-nowrap px-4 py-3 text-center font-semibold"
                       :class="[
                         props.themeMode === 'dark' ? 'text-slate-200' : 'text-slate-700',
                         isCurrentDay(date.date) ? (props.themeMode === 'dark' ? 'text-emerald-300' : 'text-emerald-800') : '',
@@ -508,7 +549,7 @@ function isCurrentDay(date: string) {
                       {{ formatMoney(date.total) }}
                     </td>
                     <td v-if="dates.length === 0" class="px-4 py-3 text-center" :class="props.themeMode === 'dark' ? 'text-slate-500' : 'text-slate-500'">-</td>
-                    <td class="px-4 py-3 text-right font-semibold" :class="props.themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900'">
+                    <td class="sticky right-0 z-20 border-l px-4 py-3 text-right font-semibold" :class="props.themeMode === 'dark' ? 'border-slate-700 bg-slate-950 text-slate-100' : 'border-slate-100 bg-slate-50 text-slate-900'">
                       {{ formatMoney(overallTotal) }}
                     </td>
                   </tr>

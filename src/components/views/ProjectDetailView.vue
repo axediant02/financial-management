@@ -6,6 +6,8 @@ import { notify } from "../../lib/feedback";
 import { centsFromPesos } from "../../lib/money";
 import type { Donor, ProjectReport } from "../../lib/types";
 import ContributionHistoryTable from "./ContributionHistoryTable.vue";
+import Dialog from "../ui/Dialog.vue";
+import CalendarPicker from "../ui/CalendarPicker.vue";
 
 type MatrixDate = {
   date: string;
@@ -51,6 +53,7 @@ const themeMode = ref<"light" | "dark">(localStorage.getItem(THEME_KEY) === "dar
 
 const donors = ref<Donor[]>([]);
 const plannedDates = ref<MatrixDate[]>([]);
+const plannedMembers = ref<string[]>([]);
 const memberAliases = ref<Record<string, string>>({});
 const warningLabel = ref("Missed");
 const redHighlightTheme = ref(true);
@@ -58,6 +61,8 @@ const currencyMode = ref<"prefix" | "suffix">("prefix");
 const newMatrixDate = ref("");
 const newMatrixNote = ref("");
 const newMemberName = ref("");
+const showMemberDialog = ref(false);
+const showDateDialog = ref(false);
 
 const showAddDonation = ref(false);
 const addDate = ref<string>(new Date().toISOString().slice(0, 10));
@@ -112,6 +117,11 @@ const projectHistoryDates = computed<ProjectHistoryDate[]>(() => {
   for (const item of report.value?.donations || []) {
     totals.set(item.donated_at, (totals.get(item.donated_at) || 0) + item.amount_cents);
   }
+  for (const planned of plannedDates.value) {
+    if (!totals.has(planned.date)) {
+      totals.set(planned.date, 0);
+    }
+  }
   return Array.from(totals.entries())
     .map(([date, total]) => ({ date, total }))
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -124,10 +134,12 @@ const projectCurrentDayTotal = computed(() => {
 
 const projectRows = computed<ProjectHistoryRow[]>(() => {
   const rowMap = new Map<string, ProjectHistoryRow>();
+  const seenNames = new Set<string>();
 
   for (const item of report.value?.donations || []) {
     const name = item.anonymous ? "Anonymous" : item.donor_name?.trim() || "Unnamed contributor";
     const key = item.anonymous ? "anon" : `name:${name.toLowerCase()}`;
+    seenNames.add(name.toLowerCase());
     const existing = rowMap.get(key);
     if (!existing) {
       rowMap.set(key, {
@@ -146,6 +158,17 @@ const projectRows = computed<ProjectHistoryRow[]>(() => {
     } else {
       existing.cells.push({ date: item.donated_at, amount: item.amount_cents });
     }
+  }
+
+  for (const plannedName of plannedMembers.value) {
+    const key = plannedName.toLowerCase();
+    if (seenNames.has(key)) continue;
+    rowMap.set(`planned:${key}`, {
+      id: `planned:${key}`,
+      name: plannedName,
+      total: 0,
+      cells: [],
+    });
   }
 
   return Array.from(rowMap.values())
@@ -169,6 +192,7 @@ function readStoredState() {
       currencyMode: "prefix" | "suffix";
       memberAliases: Record<string, string>;
       plannedDates: MatrixDate[];
+      plannedMembers: string[];
     }>;
     warningLabel.value = typeof parsed.warningLabel === "string" && parsed.warningLabel.trim() ? parsed.warningLabel : warningLabel.value;
     redHighlightTheme.value = typeof parsed.redHighlightTheme === "boolean" ? parsed.redHighlightTheme : redHighlightTheme.value;
@@ -182,8 +206,12 @@ function readStoredState() {
           }))
           .filter((value) => value.date.trim())
       : [];
+    plannedMembers.value = Array.isArray(parsed.plannedMembers)
+      ? parsed.plannedMembers.map((value) => (typeof value === "string" ? value.trim() : "")).filter((value) => value.length > 0)
+      : [];
   } catch {
     plannedDates.value = [];
+    plannedMembers.value = [];
   }
 }
 
@@ -196,6 +224,7 @@ function persistStoredState() {
       currencyMode: currencyMode.value,
       memberAliases: memberAliases.value,
       plannedDates: plannedDates.value,
+      plannedMembers: plannedMembers.value,
     }),
   );
 }
@@ -240,6 +269,19 @@ const matrixRows = computed(() => {
       locked: false,
     }));
 
+  const seen = new Set(rows.map((row) => row.displayName.trim().toLowerCase()));
+  for (const plannedName of plannedMembers.value) {
+    const normalized = plannedName.trim().toLowerCase();
+    if (!normalized || seen.has(normalized)) continue;
+    rows.push({
+      rowKey: `planned:${normalized}`,
+      displayName: plannedName,
+      alias: plannedName,
+      locked: false,
+    });
+    seen.add(normalized);
+  }
+
   if ((report.value?.donations || []).some((item) => item.anonymous)) {
     rows.push({
       rowKey: "__anonymous__",
@@ -251,6 +293,13 @@ const matrixRows = computed(() => {
 
   return rows;
 });
+
+const contributionMemberOptions = computed(() =>
+  matrixRows.value
+    .filter((row) => row.rowKey !== "__anonymous__")
+    .map((row) => row.displayName)
+    .filter((value, index, array) => array.indexOf(value) === index),
+);
 
 const matrixLookup = computed(() => {
   const lookup = new Map<string, Map<string, number>>();
@@ -307,6 +356,54 @@ function matrixRowTotal(rowKey: string) {
   return projectDates.value.reduce((sum, entry) => sum + matrixCellTotal(rowKey, entry.date), 0);
 }
 
+function rebuildProjectTotals(donations: ProjectReport["donations"]) {
+  const donationTotal = donations.reduce((sum, entry) => sum + entry.amount_cents, 0);
+  const topMap = new Map<string, number>();
+
+  for (const entry of donations) {
+    if (entry.anonymous) continue;
+    const name = entry.donor_name?.trim();
+    if (!name) continue;
+    topMap.set(name, (topMap.get(name) || 0) + entry.amount_cents);
+  }
+
+  const top_donors = Array.from(topMap.entries())
+    .map(([donor_name, total_cents]) => ({ donor_name, total_cents }))
+    .sort((a, b) => b.total_cents - a.total_cents || a.donor_name.localeCompare(b.donor_name))
+    .slice(0, 5);
+
+  if (!report.value) return;
+  report.value = {
+    ...report.value,
+    donations,
+    donations_cents: donationTotal,
+    balance_cents: donationTotal - report.value.expenses_cents,
+    remaining_to_target_cents: Math.max(0, report.value.target_amount_cents - donationTotal),
+    top_donors,
+  };
+}
+
+function appendProjectDonation(entry: {
+  donated_at: string;
+  amount_cents: number;
+  donor_name?: string | null;
+  anonymous: boolean;
+  notes?: string | null;
+}) {
+  if (!report.value) return;
+  rebuildProjectTotals([
+    ...report.value.donations,
+    {
+      id: Date.now(),
+      donated_at: entry.donated_at,
+      amount_cents: entry.amount_cents,
+      donor_name: entry.donor_name ?? null,
+      anonymous: entry.anonymous,
+      notes: entry.notes ?? null,
+    },
+  ]);
+}
+
 async function load() {
   loading.value = true;
   errorMessage.value = null;
@@ -322,44 +419,71 @@ async function load() {
   }
 }
 
-function openAddDonation() {
+function openContributionDialog(memberName = "", date = todayDate.value) {
   showAddDonation.value = true;
-  addDate.value = new Date().toISOString().slice(0, 10);
+  addDate.value = date;
   addAmount.value = "";
   addAnonymous.value = false;
-  addDonorName.value = "";
+  addDonorName.value = memberName;
   addNotes.value = "";
 }
 
 async function addMemberRow() {
   errorMessage.value = null;
   const name = newMemberName.value.trim();
-  if (!name) return;
+  if (!name) {
+    notify("Enter a member name first.");
+    return;
+  }
   if (!confirm(`Add member "${name}" to this project matrix?`)) return;
   try {
     const existing = donors.value.find((donor) => donor.name.trim().toLowerCase() === name.toLowerCase());
     if (!existing) {
       await donorsCreate(props.sessionToken, { name, notes: null });
     }
+    if (!plannedMembers.value.some((member) => member.toLowerCase() === name.toLowerCase())) {
+      plannedMembers.value = [...plannedMembers.value, name];
+      persistStoredState();
+    }
     newMemberName.value = "";
     await load();
+    showMemberDialog.value = false;
     notify(`Member "${name}" added.`);
   } catch (e: any) {
     errorMessage.value = String(e);
   }
 }
 
+function openMemberDialog() {
+  newMemberName.value = "";
+  showMemberDialog.value = true;
+}
+
 function addDateColumn() {
   const date = newMatrixDate.value.trim();
-  if (!date) return;
+  if (!date) {
+    notify("Pick a date first.");
+    return;
+  }
   if (!confirm(`Add date column ${date}?`)) return;
   if (!plannedDates.value.some((entry) => entry.date === date)) {
     plannedDates.value = [...plannedDates.value, { date, note: newMatrixNote.value.trim() || "Weekly dues" }].sort((a, b) => a.date.localeCompare(b.date));
     persistStoredState();
+  } else {
+    notify(`Date column ${date} is already in the table.`);
+    showDateDialog.value = false;
+    return;
   }
   newMatrixDate.value = "";
   newMatrixNote.value = "";
+  showDateDialog.value = false;
   notify(`Date column ${date} added.`);
+}
+
+function openDateDialog() {
+  newMatrixDate.value = new Date().toISOString().slice(0, 10);
+  newMatrixNote.value = "";
+  showDateDialog.value = true;
 }
 
 function resetGrid() {
@@ -369,6 +493,7 @@ function resetGrid() {
   currencyMode.value = "prefix";
   memberAliases.value = {};
   plannedDates.value = [];
+  plannedMembers.value = [];
   newMatrixDate.value = "";
   newMatrixNote.value = "";
   persistStoredState();
@@ -382,13 +507,14 @@ function restoreDemoData() {
   currencyMode.value = "prefix";
   memberAliases.value = {};
   plannedDates.value = [];
+  plannedMembers.value = [];
   newMatrixDate.value = "";
   newMatrixNote.value = "";
   persistStoredState();
   notify("Demo settings restored.");
 }
 
-watch([warningLabel, redHighlightTheme, currencyMode, memberAliases, plannedDates], persistStoredState, { deep: true });
+watch([warningLabel, redHighlightTheme, currencyMode, memberAliases, plannedDates, plannedMembers], persistStoredState, { deep: true });
 
 watch(themeMode, () => {
   applyTheme();
@@ -400,9 +526,17 @@ async function submitAddDonation() {
   addSubmitting.value = true;
   try {
     const amountCents = centsFromPesos(addAmount.value);
+    if (amountCents <= 0) {
+      notify("Donation amount must be greater than 0.");
+      return;
+    }
+    const donorName = addDonorName.value.trim();
+    if (!addAnonymous.value && !donorName) {
+      notify("Select a member name first.");
+      return;
+    }
     if (!confirm("Save this contribution?")) return;
     let donorId: number | null = null;
-    const donorName = addDonorName.value.trim();
     if (!addAnonymous.value && donorName) {
       const existing = donors.value.find((d) => d.name.trim().toLowerCase() === donorName.toLowerCase());
       if (existing) {
@@ -410,6 +544,15 @@ async function submitAddDonation() {
       } else {
         const created = await donorsCreate(props.sessionToken, { name: donorName, notes: null });
         donorId = created.id;
+        donors.value = [
+          ...donors.value,
+          {
+            id: created.id,
+            name: donorName,
+            notes: null,
+            created_at: new Date().toISOString(),
+          },
+        ];
       }
     }
     await donationsCreate(props.sessionToken, {
@@ -420,11 +563,22 @@ async function submitAddDonation() {
       notes: addNotes.value || null,
       project_id: props.projectId,
     });
+    appendProjectDonation({
+      donated_at: addDate.value,
+      amount_cents: amountCents,
+      donor_name: addAnonymous.value ? "Anonymous" : donorName || null,
+      anonymous: addAnonymous.value,
+      notes: addNotes.value || null,
+    });
     showAddDonation.value = false;
-    await load();
     notify("Contribution saved.");
   } catch (e: any) {
-    errorMessage.value = String(e);
+    const message = String(e);
+    if (message.includes("donation amount must be > 0")) {
+      notify("Donation amount must be greater than 0.");
+      return;
+    }
+    errorMessage.value = message;
   } finally {
     addSubmitting.value = false;
   }
@@ -511,9 +665,6 @@ onMounted(() => {
           <button class="rounded-[2px] border px-3 py-2 text-sm font-semibold" :class="themeMode === 'dark' ? 'border-slate-600 bg-slate-800 hover:bg-slate-700' : 'border-slate-300 bg-white hover:bg-slate-50'" @click="resetGrid">
             Reset Grid
           </button>
-          <button class="rounded-[2px] border px-3 py-2 text-sm font-semibold" :class="themeMode === 'dark' ? 'border-slate-600 bg-slate-800 hover:bg-slate-700' : 'border-slate-300 bg-white hover:bg-slate-50'" @click="openAddDonation">
-            + Add Contribution
-          </button>
         </div>
 
         <div class="flex flex-wrap items-center gap-3 text-sm">
@@ -584,46 +735,94 @@ onMounted(() => {
         :current-day-total="projectCurrentDayTotal"
         :current-day-label="todayDate"
         :theme-mode="themeMode"
-        :format-money="formatBoardMoney"
-        :format-date="formatDateLabel"
-      />
+      :format-money="formatBoardMoney"
+      :format-date="formatDateLabel"
+      @add-contribution="openContributionDialog"
+      @add-member="openMemberDialog"
+      @add-date="openDateDialog"
+    />
 
-      <section class="grid gap-4 lg:grid-cols-2">
-        <div class="rounded-[2px] border border-slate-300 bg-white p-4 shadow-sm">
-          <div class="text-lg font-semibold text-slate-900">Membership Appender</div>
-          <div class="mt-1 text-sm text-slate-500">Insert a new member row into the board.</div>
-          <div class="mt-4 flex gap-2">
-            <input
-              v-model="newMemberName"
-              placeholder="New member name"
-              class="min-w-0 flex-1 rounded-[2px] border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500"
-            />
-            <button class="rounded-[2px] border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white" @click="addMemberRow">
-              Add Member
-            </button>
-          </div>
-        </div>
+      <Dialog
+        v-model:open="showDateDialog"
+        :theme-mode="themeMode"
+        title="Add Date Column"
+        description="Add a new date slot to the matrix. Existing project entries stay in place."
+      >
+        <div class="grid gap-4">
+          <CalendarPicker v-model="newMatrixDate" :theme-mode="themeMode" />
 
-        <div class="rounded-[2px] border border-slate-300 bg-white p-4 shadow-sm">
-          <div class="text-lg font-semibold text-slate-900">Date Column Scheduler</div>
-          <div class="mt-1 text-sm text-slate-500">Preload a future date column and attach a note.</div>
-          <div class="mt-4 grid gap-2 md:grid-cols-3">
-            <input
-              v-model="newMatrixDate"
-              type="date"
-              class="rounded-[2px] border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500"
-            />
+          <div>
+            <label class="mb-1 block text-xs uppercase tracking-[0.2em]" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'">
+              Note
+            </label>
             <input
               v-model="newMatrixNote"
               placeholder="Column note"
-              class="rounded-[2px] border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 md:col-span-1"
+              class="w-full rounded-[2px] border px-3 py-2 text-sm outline-none"
+              :class="themeMode === 'dark' ? 'border-slate-600 bg-slate-900 text-slate-100 placeholder:text-slate-500' : 'border-slate-300 bg-white text-slate-900 placeholder:text-slate-400'"
             />
-            <button class="rounded-[2px] border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white" @click="addDateColumn">
-              Add Date
+          </div>
+
+          <div class="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              class="rounded-[2px] border px-3 py-2 text-sm font-semibold"
+              :class="themeMode === 'dark' ? 'border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700' : 'border-slate-300 bg-white text-slate-900 hover:bg-slate-50'"
+              @click="showDateDialog = false"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="rounded-[2px] border px-3 py-2 text-sm font-semibold"
+              :class="themeMode === 'dark' ? 'border-blue-500 bg-blue-500 text-white hover:bg-blue-400' : 'border-blue-600 bg-blue-600 text-white hover:bg-blue-500'"
+              @click="addDateColumn"
+            >
+              Save Date
             </button>
           </div>
         </div>
-      </section>
+      </Dialog>
+
+      <Dialog
+        v-model:open="showMemberDialog"
+        :theme-mode="themeMode"
+        title="Add Member"
+        description="Add a new contributor row to this project matrix."
+      >
+        <div class="grid gap-4">
+          <div>
+            <label class="mb-1 block text-xs uppercase tracking-[0.2em]" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'">
+              Member name
+            </label>
+            <input
+              v-model="newMemberName"
+              placeholder="New member name"
+              class="w-full rounded-[2px] border px-3 py-2 text-sm outline-none"
+              :class="themeMode === 'dark' ? 'border-slate-600 bg-slate-900 text-slate-100 placeholder:text-slate-500' : 'border-slate-300 bg-white text-slate-900 placeholder:text-slate-400'"
+            />
+          </div>
+
+          <div class="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              class="rounded-[2px] border px-3 py-2 text-sm font-semibold"
+              :class="themeMode === 'dark' ? 'border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700' : 'border-slate-300 bg-white text-slate-900 hover:bg-slate-50'"
+              @click="showMemberDialog = false"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="rounded-[2px] border px-3 py-2 text-sm font-semibold"
+              :class="themeMode === 'dark' ? 'border-blue-500 bg-blue-500 text-white hover:bg-blue-400' : 'border-blue-600 bg-blue-600 text-white hover:bg-blue-500'"
+              @click="addMemberRow"
+            >
+              Save Member
+            </button>
+          </div>
+        </div>
+      </Dialog>
 
       <section class="rounded-[2px] border border-slate-300 bg-slate-900 px-4 py-4 text-slate-100 shadow-sm">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -675,7 +874,7 @@ onMounted(() => {
           <div class="flex items-center justify-between">
             <div>
               <div class="text-lg font-bold">Add Contribution</div>
-              <div class="text-sm text-slate-400">This contribution will be linked to this project.</div>
+              <div class="text-sm text-slate-400">Pick the date and member to place the amount into the project matrix.</div>
             </div>
             <button class="rounded-lg bg-slate-800 hover:bg-slate-700 px-3 py-2 text-sm font-semibold" @click="showAddDonation = false">
               Close
@@ -688,8 +887,17 @@ onMounted(() => {
               <input v-model="addDate" type="date" class="w-full rounded-xl border border-slate-700 bg-slate-900/40 px-3 py-2" />
             </div>
             <div>
-              <div class="text-xs text-slate-400 mb-1">Amount (PHP)</div>
-              <input v-model="addAmount" inputmode="decimal" placeholder="0.00" class="w-full rounded-xl border border-slate-700 bg-slate-900/40 px-3 py-2" />
+              <div class="text-xs text-slate-400 mb-1">Member</div>
+              <input
+                v-model="addDonorName"
+                :disabled="addAnonymous"
+                list="project-member-options"
+                placeholder="Select or type a name"
+                class="w-full rounded-xl border border-slate-700 bg-slate-900/40 px-3 py-2 disabled:opacity-60"
+              />
+              <datalist id="project-member-options">
+                <option v-for="member in contributionMemberOptions" :key="member" :value="member" />
+              </datalist>
             </div>
             <div>
               <div class="text-xs text-slate-400 mb-1">Anonymous</div>
@@ -699,14 +907,8 @@ onMounted(() => {
               </label>
             </div>
             <div>
-              <div class="text-xs text-slate-400 mb-1">Name</div>
-              <input
-                v-model="addDonorName"
-                :disabled="addAnonymous"
-                placeholder="optional"
-                class="w-full rounded-xl border border-slate-700 bg-slate-900/40 px-3 py-2 disabled:opacity-60"
-              />
-              <div class="mt-1 text-xs text-slate-500">If this name doesn't exist yet, it will be created.</div>
+              <div class="text-xs text-slate-400 mb-1">Amount (PHP)</div>
+              <input v-model="addAmount" inputmode="decimal" placeholder="0.00" class="w-full rounded-xl border border-slate-700 bg-slate-900/40 px-3 py-2" />
             </div>
             <div class="md:col-span-2">
               <div class="text-xs text-slate-400 mb-1">Notes</div>
