@@ -54,11 +54,9 @@ async function handleBootstrap(password: string) {
   notify("Admin password created.");
 }
 
-async function handleLogin(password: string) {
-  errorMessage.value = null;
-  const res = await login(password);
-  sessionToken.value = res.session_token;
-  localStorage.setItem("pft_session_token", res.session_token);
+function handleLoginSuccess(token: string) {
+  sessionToken.value = token;
+  localStorage.setItem("pft_session_token", token);
   notify("Logged in.");
 }
 
@@ -165,7 +163,11 @@ onMounted(async () => {
         @bootstrap="handleBootstrap"
       />
 
-      <LoginPage v-else-if="!isAuthed" @login="handleLogin" @reset-password="handleResetPassword" />
+      <LoginPage
+        v-else-if="!isAuthed"
+        @login-success="handleLoginSuccess"
+        @reset-password="handleResetPassword"
+      />
 
       <MainApp v-else :session-token="sessionToken!" @logout="handleLogout" />
     </div>

@@ -3,17 +3,30 @@ import { computed, onMounted, ref, watch } from "vue";
 import { save } from "@tauri-apps/plugin-dialog";
 import { donationsCreate, donorsCreate, donorsList, exportCsv, exportPdf, projectReport } from "../../lib/api";
 import { notify } from "../../lib/feedback";
-import { centsFromPesos, formatPHPFromCents } from "../../lib/money";
+import { centsFromPesos } from "../../lib/money";
 import type { Donor, ProjectReport } from "../../lib/types";
+import ContributionHistoryTable from "./ContributionHistoryTable.vue";
 
 type MatrixDate = {
   date: string;
   note: string;
 };
 
-type CellEditor = {
-  rowKey: string;
+type ProjectHistoryDate = {
   date: string;
+  total: number;
+};
+
+type ProjectHistoryCell = {
+  date: string;
+  amount: number;
+};
+
+type ProjectHistoryRow = {
+  id: string;
+  name: string;
+  total: number;
+  cells: ProjectHistoryCell[];
 };
 
 const props = defineProps<{
@@ -27,15 +40,14 @@ const emit = defineEmits<{
 
 const filterFrom = ref<string>("");
 const filterTo = ref<string>("");
-const memberSearch = ref("");
-const boardFilter = ref<"all" | "paid" | "missed" | "unpaid">("all");
-const sortMode = ref<"name-asc" | "name-desc">("name-asc");
 const matrixStorageKey = computed(() => `pft_project_matrix_state_${props.projectId}`);
+const THEME_KEY = "pft_theme_mode";
 
 const report = ref<ProjectReport | null>(null);
 const loading = ref(true);
 const errorMessage = ref<string | null>(null);
 const lastSyncedAt = ref<string | null>(null);
+const themeMode = ref<"light" | "dark">(localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light");
 
 const donors = ref<Donor[]>([]);
 const plannedDates = ref<MatrixDate[]>([]);
@@ -46,10 +58,6 @@ const currencyMode = ref<"prefix" | "suffix">("prefix");
 const newMatrixDate = ref("");
 const newMatrixNote = ref("");
 const newMemberName = ref("");
-
-const cellEditor = ref<CellEditor | null>(null);
-const cellAmount = ref("");
-const cellNotes = ref("");
 
 const showAddDonation = ref(false);
 const addDate = ref<string>(new Date().toISOString().slice(0, 10));
@@ -65,82 +73,27 @@ const filter = computed(() => ({
   project_id: props.projectId,
 }));
 
-type RowStatus = "paid" | "missed" | "unpaid" | "anonymous";
-
-const rowStats = computed(() => {
-  const stats = new Map<
-    string,
-    {
-      filled: number;
-      total: number;
-      status: RowStatus;
-    }
-  >();
-
-  for (const row of matrixRows.value) {
-    const filled = projectDates.value.reduce((sum, entry) => sum + (matrixCellTotal(row.rowKey, entry.date) > 0 ? 1 : 0), 0);
-    const total = matrixRowTotal(row.rowKey);
-    let status: RowStatus = "unpaid";
-
-    if (row.rowKey === "__anonymous__") {
-      status = total > 0 ? "anonymous" : "unpaid";
-    } else if (projectDates.value.length > 0 && filled === projectDates.value.length) {
-      status = "paid";
-    } else if (total > 0) {
-      status = "missed";
-    }
-
-    stats.set(row.rowKey, { filled, total, status });
-  }
-
-  return stats;
-});
-
-const visibleRows = computed(() => {
-  const query = memberSearch.value.trim().toLowerCase();
-  const rows = matrixRows.value.filter((row) => {
-    const stats = rowStats.value.get(row.rowKey);
-    const total = stats?.total || 0;
-    if (boardFilter.value === "paid" && total <= 0) return false;
-    if (boardFilter.value === "missed" && stats?.status !== "missed") return false;
-    if (boardFilter.value === "unpaid" && stats?.status !== "unpaid") return false;
-    if (query) {
-      const haystack = `${row.displayName} ${row.alias}`.toLowerCase();
-      if (!haystack.includes(query)) return false;
-    }
-    return true;
-  });
-
-  rows.sort((a, b) => {
-    const left = (memberAliases.value[a.rowKey]?.trim() || a.alias || a.displayName).toLowerCase();
-    const right = (memberAliases.value[b.rowKey]?.trim() || b.alias || b.displayName).toLowerCase();
-    return sortMode.value === "name-asc" ? left.localeCompare(right) : right.localeCompare(left);
-  });
-
-  return rows;
-});
-
-const filterCounts = computed(() => {
-  let all = 0;
-  let paid = 0;
-  let missed = 0;
-  let unpaid = 0;
-  for (const row of matrixRows.value) {
-    const stats = rowStats.value.get(row.rowKey);
-    all += 1;
-    if ((stats?.total || 0) > 0) paid += 1;
-    if (stats?.status === "missed") missed += 1;
-    if (stats?.status === "unpaid") unpaid += 1;
-  }
-  return { all, paid, missed, unpaid };
-});
-
 function formatBoardMoney(cents: number) {
   const amount = (cents / 100).toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
   return currencyMode.value === "prefix" ? `PHP ${amount}` : `${amount} PHP`;
+}
+
+function formatDateLabel(value: string) {
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(parsed);
+}
+
+function applyTheme() {
+  document.documentElement.dataset.theme = themeMode.value;
+  localStorage.setItem(THEME_KEY, themeMode.value);
 }
 
 const progressPct = computed(() => {
@@ -151,9 +104,60 @@ const progressPct = computed(() => {
 });
 
 const projectTotal = computed(() => report.value?.donations_cents || 0);
-const ledgerMinWidth = computed(() => 290 + Math.max(projectDates.value.length, 5) * 190 + 150);
-const ledgerGridColumns = computed(() => `290px ${projectDates.value.map(() => "190px").join(" ")} 150px`);
-const overallTotalLabel = computed(() => (report.value?.project.status === "completed" ? "Completed Total" : "Overall Total"));
+
+const todayDate = computed(() => new Date().toISOString().slice(0, 10));
+
+const projectHistoryDates = computed<ProjectHistoryDate[]>(() => {
+  const totals = new Map<string, number>();
+  for (const item of report.value?.donations || []) {
+    totals.set(item.donated_at, (totals.get(item.donated_at) || 0) + item.amount_cents);
+  }
+  return Array.from(totals.entries())
+    .map(([date, total]) => ({ date, total }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+});
+
+const projectCurrentDayTotal = computed(() => {
+  const current = projectHistoryDates.value.find((entry) => entry.date === todayDate.value);
+  return current?.total || 0;
+});
+
+const projectRows = computed<ProjectHistoryRow[]>(() => {
+  const rowMap = new Map<string, ProjectHistoryRow>();
+
+  for (const item of report.value?.donations || []) {
+    const name = item.anonymous ? "Anonymous" : item.donor_name?.trim() || "Unnamed contributor";
+    const key = item.anonymous ? "anon" : `name:${name.toLowerCase()}`;
+    const existing = rowMap.get(key);
+    if (!existing) {
+      rowMap.set(key, {
+        id: key,
+        name,
+        total: item.amount_cents,
+        cells: [{ date: item.donated_at, amount: item.amount_cents }],
+      });
+      continue;
+    }
+
+    existing.total += item.amount_cents;
+    const cell = existing.cells.find((entry) => entry.date === item.donated_at);
+    if (cell) {
+      cell.amount += item.amount_cents;
+    } else {
+      existing.cells.push({ date: item.donated_at, amount: item.amount_cents });
+    }
+  }
+
+  return Array.from(rowMap.values())
+    .map((row) => ({
+      ...row,
+      cells: projectHistoryDates.value.map((date) => ({
+        date: date.date,
+        amount: row.cells.find((cell) => cell.date === date.date)?.amount ?? 0,
+      })),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+});
 
 function readStoredState() {
   try {
@@ -268,15 +272,6 @@ const matrixLookup = computed(() => {
   return lookup;
 });
 
-const dailyTotals = computed(() =>
-  projectDates.value.map((entry) => ({
-    date: entry.date,
-    total: (report.value?.donations || [])
-      .filter((item) => item.donated_at === entry.date)
-      .reduce((sum, item) => sum + item.amount_cents, 0),
-  })),
-);
-
 const activeMembers = computed(() => matrixRows.value.filter((row) => row.rowKey !== "__anonymous__" && matrixRowTotal(row.rowKey) > 0).length);
 const paidMembers = computed(() => donors.value.length);
 
@@ -284,7 +279,7 @@ const filledCells = computed(() => {
   let count = 0;
   for (const row of matrixRows.value) {
     for (const date of projectDates.value) {
-      if (matrixCellTotal(row.rowKey, date) > 0) count += 1;
+      if (matrixCellTotal(row.rowKey, date.date) > 0) count += 1;
     }
   }
   return count;
@@ -310,77 +305,6 @@ function matrixCellTotal(rowKey: string, date: string) {
 
 function matrixRowTotal(rowKey: string) {
   return projectDates.value.reduce((sum, entry) => sum + matrixCellTotal(rowKey, entry.date), 0);
-}
-
-function rowStatus(rowKey: string): RowStatus {
-  return rowStats.value.get(rowKey)?.status || "unpaid";
-}
-
-function rowStatusLabel(rowKey: string) {
-  const stats = rowStats.value.get(rowKey);
-  if (!stats) return "Unpaid";
-  switch (stats.status) {
-    case "paid":
-      return `Paid all`;
-    case "missed":
-      return `Missed: ${stats.filled} / ${projectDates.value.length}`;
-    case "anonymous":
-      return "Anonymous";
-    case "unpaid":
-      return `Unpaid: 0 / ${projectDates.value.length}`;
-  }
-}
-
-function dateNote(date: string) {
-  return plannedDates.value.find((entry) => entry.date === date)?.note || "Recorded contribution";
-}
-
-function formatReadableDate(date: string) {
-  const parsed = new Date(`${date}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return date;
-  return new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  }).format(parsed);
-}
-
-function openCell(rowKey: string, date: string) {
-  cellEditor.value = { rowKey, date };
-  cellAmount.value = "";
-  cellNotes.value = "";
-}
-
-function closeCell() {
-  cellEditor.value = null;
-  cellAmount.value = "";
-  cellNotes.value = "";
-}
-
-async function saveCell() {
-  if (!cellEditor.value) return;
-  const amount = Number(String(cellAmount.value).replace(/,/g, ""));
-  if (!Number.isFinite(amount) || amount <= 0) {
-    errorMessage.value = "Enter a valid amount greater than zero.";
-    return;
-  }
-  if (!confirm("Save this contribution cell?")) return;
-  try {
-    const donorId = cellEditor.value.rowKey.startsWith("donor:") ? Number(cellEditor.value.rowKey.split(":")[1]) : null;
-    await donationsCreate(props.sessionToken, {
-      donated_at: cellEditor.value.date,
-      amount_cents: Math.round(amount * 100),
-      donor_id: donorId,
-      anonymous: cellEditor.value.rowKey === "__anonymous__",
-      notes: cellNotes.value.trim() || null,
-      project_id: props.projectId,
-    });
-    closeCell();
-    await load();
-    notify("Contribution saved.");
-  } catch (e: any) {
-    errorMessage.value = String(e);
-  }
 }
 
 async function load() {
@@ -447,7 +371,6 @@ function resetGrid() {
   plannedDates.value = [];
   newMatrixDate.value = "";
   newMatrixNote.value = "";
-  closeCell();
   persistStoredState();
   notify("Grid reset.");
 }
@@ -461,19 +384,16 @@ function restoreDemoData() {
   plannedDates.value = [];
   newMatrixDate.value = "";
   newMatrixNote.value = "";
-  closeCell();
   persistStoredState();
   notify("Demo settings restored.");
 }
 
-function setAlias(rowKey: string, value: string) {
-  memberAliases.value = {
-    ...memberAliases.value,
-    [rowKey]: value,
-  };
-}
-
 watch([warningLabel, redHighlightTheme, currencyMode, memberAliases, plannedDates], persistStoredState, { deep: true });
+
+watch(themeMode, () => {
+  applyTheme();
+  window.dispatchEvent(new CustomEvent("pft:theme-change", { detail: themeMode.value }));
+});
 
 async function submitAddDonation() {
   errorMessage.value = null;
@@ -535,112 +455,121 @@ async function exportProjectDonationsCsv() {
 }
 
 onMounted(load);
+onMounted(() => {
+  applyTheme();
+  window.addEventListener("pft:theme-change", (event: Event) => {
+    const detail = (event as CustomEvent).detail;
+    if (detail === "light" || detail === "dark") {
+      themeMode.value = detail;
+    }
+  });
+});
 </script>
 
 <template>
-  <div class="space-y-6">
-    <section class="overflow-hidden rounded-[2px] border border-slate-300 bg-slate-950 text-slate-100 shadow-sm">
-      <div class="border-b-4 border-blue-600 bg-slate-900 px-6 py-5">
+  <div class="space-y-6" :class="themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900'">
+    <section class="overflow-hidden rounded-[2px] border shadow-sm" :class="themeMode === 'dark' ? 'border-slate-700 bg-slate-950 text-slate-100' : 'border-slate-200 bg-white text-slate-900'">
+      <div class="border-b-4 border-blue-600 px-6 py-5" :class="themeMode === 'dark' ? 'bg-slate-900' : 'bg-slate-50'">
         <div class="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p class="text-[11px] uppercase tracking-[0.4em] text-slate-400">Group Contribution Board</p>
-            <h2 class="mt-2 max-w-4xl text-3xl font-semibold tracking-tight text-white md:text-4xl">
+            <p class="text-[11px] uppercase tracking-[0.4em]" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'">Group Contribution Board</p>
+            <h2 class="mt-2 max-w-4xl text-3xl font-semibold tracking-tight md:text-4xl" :class="themeMode === 'dark' ? 'text-white' : 'text-slate-900'">
               {{ report?.project.name || "Loading..." }} contribution register
             </h2>
-            <p class="mt-2 max-w-3xl text-sm text-slate-300">
+            <p class="mt-2 max-w-3xl text-sm" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-600'">
               Formal class record book for one project with dated history, live totals, and editable member rows.
             </p>
           </div>
 
           <div class="grid gap-3 text-right sm:grid-cols-2 xl:min-w-[28rem]">
-            <div class="rounded-[2px] border border-slate-300 bg-slate-950 px-4 py-3">
-              <div class="text-[11px] uppercase tracking-[0.3em] text-slate-400">Total Collected</div>
-              <div class="mt-2 text-2xl font-semibold text-cyan-400">{{ formatBoardMoney(projectTotal) }}</div>
+            <div class="rounded-[2px] border px-4 py-3" :class="themeMode === 'dark' ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'">
+              <div class="text-[11px] uppercase tracking-[0.3em]" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'">Total Collected</div>
+              <div class="mt-2 text-2xl font-semibold" :class="themeMode === 'dark' ? 'text-cyan-400' : 'text-emerald-700'">{{ formatBoardMoney(projectTotal) }}</div>
             </div>
-            <div class="rounded-[2px] border border-slate-300 bg-slate-950 px-4 py-3">
-              <div class="text-[11px] uppercase tracking-[0.3em] text-slate-400">Target Completion</div>
-              <div class="mt-2 text-2xl font-semibold text-emerald-400">{{ progressPct }}%</div>
+            <div class="rounded-[2px] border px-4 py-3" :class="themeMode === 'dark' ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'">
+              <div class="text-[11px] uppercase tracking-[0.3em]" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'">Target Completion</div>
+              <div class="mt-2 text-2xl font-semibold" :class="themeMode === 'dark' ? 'text-emerald-400' : 'text-emerald-700'">{{ progressPct }}%</div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="flex flex-col gap-3 border-b border-slate-300 bg-white px-4 py-3 text-slate-900 lg:flex-row lg:items-center lg:justify-between">
+      <div class="flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between" :class="themeMode === 'dark' ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'">
         <div class="flex flex-wrap items-center gap-2">
-          <button class="rounded-[2px] border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" @click="emit('back')">
+          <button class="rounded-[2px] border px-3 py-2 text-sm font-semibold" :class="themeMode === 'dark' ? 'border-slate-600 bg-slate-800 hover:bg-slate-700' : 'border-slate-300 bg-white hover:bg-slate-50'" @click="emit('back')">
             Back
           </button>
-          <button class="rounded-[2px] border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" @click="exportProjectDonationsCsv">
+          <button class="rounded-[2px] border px-3 py-2 text-sm font-semibold" :class="themeMode === 'dark' ? 'border-slate-600 bg-slate-800 hover:bg-slate-700' : 'border-slate-300 bg-white hover:bg-slate-50'" @click="exportProjectDonationsCsv">
             Export CSV
           </button>
-          <button class="rounded-[2px] border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" @click="exportProjectSummaryPdf">
+          <button class="rounded-[2px] border px-3 py-2 text-sm font-semibold" :class="themeMode === 'dark' ? 'border-slate-600 bg-slate-800 hover:bg-slate-700' : 'border-slate-300 bg-white hover:bg-slate-50'" @click="exportProjectSummaryPdf">
             Export PDF
           </button>
-          <button class="rounded-[2px] border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" @click="restoreDemoData">
+          <button class="rounded-[2px] border px-3 py-2 text-sm font-semibold" :class="themeMode === 'dark' ? 'border-slate-600 bg-slate-800 hover:bg-slate-700' : 'border-slate-300 bg-white hover:bg-slate-50'" @click="restoreDemoData">
             Restore Demo Data
           </button>
-          <button class="rounded-[2px] border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" @click="resetGrid">
+          <button class="rounded-[2px] border px-3 py-2 text-sm font-semibold" :class="themeMode === 'dark' ? 'border-slate-600 bg-slate-800 hover:bg-slate-700' : 'border-slate-300 bg-white hover:bg-slate-50'" @click="resetGrid">
             Reset Grid
           </button>
-          <button class="rounded-[2px] border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" @click="openAddDonation">
+          <button class="rounded-[2px] border px-3 py-2 text-sm font-semibold" :class="themeMode === 'dark' ? 'border-slate-600 bg-slate-800 hover:bg-slate-700' : 'border-slate-300 bg-white hover:bg-slate-50'" @click="openAddDonation">
             + Add Contribution
           </button>
         </div>
 
         <div class="flex flex-wrap items-center gap-3 text-sm">
-          <div class="rounded-[2px] border border-slate-300 bg-slate-50 px-3 py-2">
+          <div class="rounded-[2px] border px-3 py-2" :class="themeMode === 'dark' ? 'border-slate-600 bg-slate-800 text-slate-100' : 'border-slate-300 bg-slate-50 text-slate-900'">
             Auto-sync: <span class="font-semibold">{{ lastSyncedAt || "Pending" }}</span>
           </div>
-          <div class="rounded-[2px] border border-slate-300 bg-slate-50 px-3 py-2">
+          <div class="rounded-[2px] border px-3 py-2" :class="themeMode === 'dark' ? 'border-slate-600 bg-slate-800 text-slate-100' : 'border-slate-300 bg-slate-50 text-slate-900'">
             Status: <span class="font-semibold">{{ report?.project.status || "-" }}</span>
           </div>
         </div>
       </div>
     </section>
 
-    <div v-if="errorMessage" class="rounded-[2px] border border-rose-300 bg-rose-50 p-4 text-rose-700">
+    <div v-if="errorMessage" class="rounded-[2px] border p-4" :class="themeMode === 'dark' ? 'border-rose-500/40 bg-rose-500/10 text-rose-200' : 'border-rose-300 bg-rose-50 text-rose-700'">
       {{ errorMessage }}
     </div>
 
-    <div v-else-if="loading" class="rounded-[2px] border border-slate-300 bg-white p-4 text-slate-500">
+    <div v-else-if="loading" class="rounded-[2px] border p-4" :class="themeMode === 'dark' ? 'border-slate-700 bg-slate-900 text-slate-400' : 'border-slate-300 bg-white text-slate-500'">
       Loading...
     </div>
 
     <div v-else-if="report" class="space-y-6">
       <section class="grid gap-4 px-1 md:grid-cols-2 xl:grid-cols-5">
-        <div class="rounded-[2px] border border-slate-300 bg-white p-4">
+        <div class="rounded-[2px] border p-4" :class="themeMode === 'dark' ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-white'">
           <div class="flex items-start justify-between gap-3">
             <div>
-              <div class="text-[11px] uppercase tracking-[0.3em] text-slate-500">Total Collected</div>
-              <div class="mt-2 text-2xl font-semibold text-emerald-600">{{ formatBoardMoney(projectTotal) }}</div>
+              <div class="text-[11px] uppercase tracking-[0.3em]" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'">Total Collected</div>
+              <div class="mt-2 text-2xl font-semibold" :class="themeMode === 'dark' ? 'text-emerald-400' : 'text-emerald-600'">{{ formatBoardMoney(projectTotal) }}</div>
             </div>
-            <div class="rounded-[2px] border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+            <div class="rounded-[2px] border px-2 py-1 text-xs font-semibold" :class="themeMode === 'dark' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700'">
               Live
             </div>
           </div>
         </div>
-        <div class="rounded-[2px] border border-slate-300 bg-white p-4">
-          <div class="text-[11px] uppercase tracking-[0.3em] text-slate-500">Group Target</div>
-          <div class="mt-2 text-2xl font-semibold text-blue-700">{{ formatBoardMoney(report.target_amount_cents) }}</div>
-          <div class="mt-2 inline-flex rounded-[2px] border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+        <div class="rounded-[2px] border p-4" :class="themeMode === 'dark' ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-white'">
+          <div class="text-[11px] uppercase tracking-[0.3em]" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'">Group Target</div>
+          <div class="mt-2 text-2xl font-semibold" :class="themeMode === 'dark' ? 'text-blue-300' : 'text-blue-700'">{{ formatBoardMoney(report.target_amount_cents) }}</div>
+          <div class="mt-2 inline-flex rounded-[2px] border px-2 py-1 text-xs font-semibold" :class="themeMode === 'dark' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700'">
             {{ progressPct }}% complete
           </div>
         </div>
-        <div class="rounded-[2px] border border-slate-300 bg-white p-4">
-          <div class="text-[11px] uppercase tracking-[0.3em] text-slate-500">Members Paid</div>
-          <div class="mt-2 text-2xl font-semibold text-slate-900">{{ activeMembers }} / {{ paidMembers }}</div>
-          <div class="mt-2 text-xs text-slate-500">Participation fraction</div>
+        <div class="rounded-[2px] border p-4" :class="themeMode === 'dark' ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-white'">
+          <div class="text-[11px] uppercase tracking-[0.3em]" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'">Members Paid</div>
+          <div class="mt-2 text-2xl font-semibold" :class="themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900'">{{ activeMembers }} / {{ paidMembers }}</div>
+          <div class="mt-2 text-xs" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'">Participation fraction</div>
         </div>
-        <div class="rounded-[2px] border border-slate-300 bg-white p-4">
-          <div class="text-[11px] uppercase tracking-[0.3em] text-slate-500">Fidelity Index</div>
-          <div class="mt-2 text-2xl font-semibold text-indigo-700">{{ fidelityPct }}%</div>
-          <div class="mt-2 text-xs text-slate-500">Filled cells vs. board size</div>
+        <div class="rounded-[2px] border p-4" :class="themeMode === 'dark' ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-white'">
+          <div class="text-[11px] uppercase tracking-[0.3em]" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'">Fidelity Index</div>
+          <div class="mt-2 text-2xl font-semibold" :class="themeMode === 'dark' ? 'text-indigo-300' : 'text-indigo-700'">{{ fidelityPct }}%</div>
+          <div class="mt-2 text-xs" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'">Filled cells vs. board size</div>
         </div>
-        <div class="rounded-[2px] border border-slate-300 bg-white p-4">
-          <div class="text-[11px] uppercase tracking-[0.3em] text-slate-500">Top Supporter</div>
-          <div class="mt-2 text-2xl font-semibold text-amber-700">{{ topSupporter.name }}</div>
-          <div class="mt-2 inline-flex items-center gap-2 rounded-[2px] border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">
-            <svg class="h-3.5 w-3.5 text-amber-700" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <div class="rounded-[2px] border p-4" :class="themeMode === 'dark' ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-white'">
+          <div class="text-[11px] uppercase tracking-[0.3em]" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'">Top Supporter</div>
+          <div class="mt-2 text-2xl font-semibold" :class="themeMode === 'dark' ? 'text-amber-300' : 'text-amber-700'">{{ topSupporter.name }}</div>
+          <div class="mt-2 inline-flex items-center gap-2 rounded-[2px] border px-2 py-1 text-xs font-semibold" :class="themeMode === 'dark' ? 'border-amber-500/20 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'">
+            <svg class="h-3.5 w-3.5" :class="themeMode === 'dark' ? 'text-amber-300' : 'text-amber-700'" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M3 7l5 4 4-6 4 6 5-4-2 11H5L3 7zm3 11h12v2H6z" />
             </svg>
             <span>{{ formatBoardMoney(topSupporter.total) }}</span>
@@ -648,7 +577,16 @@ onMounted(load);
         </div>
       </section>
 
- 
+      <ContributionHistoryTable
+        :rows="projectRows"
+        :dates="projectHistoryDates"
+        :overall-total="projectTotal"
+        :current-day-total="projectCurrentDayTotal"
+        :current-day-label="todayDate"
+        :theme-mode="themeMode"
+        :format-money="formatBoardMoney"
+        :format-date="formatDateLabel"
+      />
 
       <section class="grid gap-4 lg:grid-cols-2">
         <div class="rounded-[2px] border border-slate-300 bg-white p-4 shadow-sm">

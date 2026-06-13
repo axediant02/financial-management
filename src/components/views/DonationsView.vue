@@ -2,7 +2,6 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { save } from "@tauri-apps/plugin-dialog";
 import {
-  donationsCreate,
   donationsDelete,
   donationsList,
   donorsCreate,
@@ -17,11 +16,6 @@ import ContributionHistoryTable from "./ContributionHistoryTable.vue";
 type PlannedDate = {
   date: string;
   note: string;
-};
-
-type CellEditor = {
-  rowKey: string;
-  date: string;
 };
 
 const props = defineProps<{ sessionToken: string }>();
@@ -48,16 +42,11 @@ const redHighlightTheme = ref(true);
 const currencyMode = ref<"prefix" | "suffix">(defaultCurrencyMode);
 const themeMode = ref<"light" | "dark">(defaultThemeMode);
 const memberAliases = ref<Record<string, string>>({});
-const plannedDates = ref<PlannedDate[]>([]);
+const plannedDates = ref<{ date: string; note: string }[]>([]);
 
 const newMemberName = ref("");
 const newDateValue = ref("");
 const newDateNote = ref("");
-
-const cellEditor = ref<CellEditor | null>(null);
-const cellAmount = ref("");
-const cellNotes = ref("");
-const cellProjectId = ref<string>("");
 
 const donorsById = computed(() => new Map(donors.value.map((d) => [d.id, d])));
 const projectsById = computed(() => new Map(projects.value.map((p) => [p.id, p])));
@@ -394,47 +383,6 @@ function addPlannedDate() {
   notify(`Planned date ${date} added.`);
 }
 
-function openCell(rowKey: string, date: string) {
-  cellEditor.value = { rowKey, date };
-  cellAmount.value = "";
-  cellNotes.value = "";
-  cellProjectId.value = scopeProjectId.value;
-}
-
-function closeCell() {
-  cellEditor.value = null;
-  cellAmount.value = "";
-  cellNotes.value = "";
-}
-
-async function saveCell() {
-  if (!cellEditor.value) return;
-  errorMessage.value = null;
-  const row = cellEditor.value.rowKey;
-  const amount = Number(String(cellAmount.value).replace(/,/g, ""));
-  if (!Number.isFinite(amount) || amount <= 0) {
-    errorMessage.value = "Enter a valid amount greater than zero.";
-    return;
-  }
-  if (!confirm("Save this contribution record?")) return;
-  try {
-    const donorId = row.startsWith("donor:") ? Number(row.split(":")[1]) : null;
-    await donationsCreate(props.sessionToken, {
-      donated_at: cellEditor.value.date,
-      amount_cents: Math.round(amount * 100),
-      donor_id: donorId,
-      anonymous: row === "anon",
-      notes: cellNotes.value.trim() || null,
-      project_id: cellProjectId.value ? Number(cellProjectId.value) : null,
-    });
-    closeCell();
-    await load();
-    notify("Contribution saved.");
-  } catch (e: any) {
-    errorMessage.value = String(e);
-  }
-}
-
 async function removeEntry(id: number) {
   if (!confirm("Delete this contribution record?")) return;
   try {
@@ -446,20 +394,10 @@ async function removeEntry(id: number) {
   }
 }
 
-function setAlias(rowKey: string, value: string) {
-  memberAliases.value = {
-    ...memberAliases.value,
-    [rowKey]: value,
-  };
-}
-
 function resetGrid() {
   if (!confirm("Reset the grid settings? This clears cached board preferences only.")) return;
   memberAliases.value = {};
   plannedDates.value = [];
-  cellEditor.value = null;
-  cellAmount.value = "";
-  cellNotes.value = "";
   newMemberName.value = "";
   newDateValue.value = "";
   newDateNote.value = "";
@@ -476,9 +414,6 @@ function restoreDemoData() {
   currencyMode.value = defaultCurrencyMode;
   memberAliases.value = {};
   plannedDates.value = [];
-  cellEditor.value = null;
-  cellAmount.value = "";
-  cellNotes.value = "";
   newMemberName.value = "";
   newDateValue.value = "";
   newDateNote.value = "";

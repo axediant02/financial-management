@@ -1,25 +1,31 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { resetAdminPassword } from "../lib/api";
+import { login, resetAdminPassword } from "../lib/api";
 
 const emit = defineEmits<{
-  (e: "login", password: string): void;
+  (e: "login-success", sessionToken: string): void;
   (e: "reset-password"): void;
 }>();
 
 const password = ref("");
 const submitting = ref(false);
 const errorMessage = ref<string | null>(null);
+const successMessage = ref<string | null>(null);
 const resetConfirm = ref("");
 const resetting = ref(false);
 
 async function handleLogin() {
   errorMessage.value = null;
+  successMessage.value = null;
   submitting.value = true;
   try {
-    emit("login", password.value);
+    const res = await login(password.value);
+    emit("login-success", res.session_token);
+    successMessage.value = "Login successful.";
+    password.value = "";
   } catch (e: any) {
-    errorMessage.value = String(e);
+    successMessage.value = null;
+    errorMessage.value = "Login failed. Check your password and try again.";
   } finally {
     submitting.value = false;
   }
@@ -89,6 +95,13 @@ async function handleReset() {
             class="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-rose-200 text-sm"
           >
             {{ errorMessage }}
+          </div>
+
+          <div
+            v-if="successMessage"
+            class="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3 text-emerald-200 text-sm"
+          >
+            {{ successMessage }}
           </div>
 
           <button
