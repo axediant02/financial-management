@@ -222,3 +222,10 @@ pub struct BackupInfo {
     pub created_at: String,
     pub bytes: u64,
 }
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DatabaseHealth {
+    pub integrity_ok: bool,
+    pub checked_at: String,
+    pub record_count: i64,
+}

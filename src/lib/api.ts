@@ -8,6 +8,7 @@ import type {
   Donation,
   Donor,
   Expense,
+  DatabaseHealth,
   LedgerSummary,
   ProjectReport,
   Project,
@@ -249,4 +250,8 @@ export async function backupCreate(session_token: string): Promise<string> {
 
 export async function backupRestore(session_token: string, src_path: string): Promise<void> {
   await invokeAuthed("backup_restore", { sessionToken: session_token, srcPath: src_path });
+}
+
+export async function databaseHealth(session_token: string): Promise<DatabaseHealth> {
+  return await invokeAuthed("database_health", { sessionToken: session_token });
 }

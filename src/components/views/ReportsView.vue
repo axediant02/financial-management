@@ -9,9 +9,10 @@ import type { LedgerSummary, Project, ProjectBalanceRow } from "../../lib/types"
 const props = defineProps<{ sessionToken: string }>();
 
 const projects = ref<Project[]>([]);
-const filterFrom = ref<string>("");
-const filterTo = ref<string>("");
+const filterFrom = ref(getYearStartString());
+const filterTo = ref(getLocalDateString());
 const filterProjectId = ref<string>("");
+const reportType = ref("statement");
 
 const summary = ref<LedgerSummary | null>(null);
 const balances = ref<ProjectBalanceRow[]>([]);
@@ -24,156 +25,405 @@ const activeFilter = computed(() => ({
   project_id: filterProjectId.value ? Number(filterProjectId.value) : null,
 }));
 
+const projectMap = computed(() => new Map(projects.value.map((project) => [project.id, project])));
+
+const reportRows = computed(() =>
+  balances.value
+    .slice()
+    .sort((a, b) => a.project_name.localeCompare(b.project_name))
+    .map((row) => {
+      const project = projectMap.value.get(row.project_id);
+      const targetCents = project?.target_amount_cents ?? 0;
+      const fundedPct = targetCents > 0 ? Math.min(100, Math.round((row.donations_cents / targetCents) * 100)) : 0;
+
+      return {
+        ...row,
+        project_code: `PRJ-${String(row.project_id).padStart(3, "0")}`,
+        target_cents: targetCents,
+        funded_pct: fundedPct,
+      };
+    }),
+);
+
+const totalTargetCents = computed(() =>
+  reportRows.value.reduce((sum, row) => sum + row.target_cents, 0),
+);
+
+const totalReceiptsCents = computed(() =>
+  reportRows.value.reduce((sum, row) => sum + row.donations_cents, 0),
+);
+
+const totalDisbursementsCents = computed(() =>
+  reportRows.value.reduce((sum, row) => sum + row.expenses_cents, 0),
+);
+
+const endingBalanceCents = computed(() =>
+  reportRows.value.reduce((sum, row) => sum + row.balance_cents, 0),
+);
+
+const reportRangeLabel = computed(() => {
+  const from = formatDateLong(filterFrom.value);
+  const to = formatDateLong(filterTo.value);
+  return `For the period ${from} to ${to} · in Philippine Peso`;
+});
+
+function getLocalDateString(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getYearStartString() {
+  const now = new Date();
+  return `${now.getFullYear()}-01-01`;
+}
+
+function formatDateLong(value: string) {
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(parsed);
+}
+
+function formatPercent(numerator: number, denominator: number) {
+  if (denominator <= 0) return "0%";
+  return `${Math.min(100, Math.round((numerator / denominator) * 100))}%`;
+}
+
+function formatSignedMoney(cents: number) {
+  const formatted = formatPHPFromCents(Math.abs(cents));
+  return cents < 0 ? `(${formatted})` : formatted;
+}
+
 async function load() {
   loading.value = true;
   errorMessage.value = null;
   try {
-    projects.value = await projectsList(props.sessionToken);
-    summary.value = await ledgerSummary(props.sessionToken, activeFilter.value);
-    balances.value = await projectBalances(props.sessionToken, activeFilter.value);
-  } catch (e: any) {
-    errorMessage.value = String(e);
+    const [projectRows, summaryValue, balancesValue] = await Promise.all([
+      projectsList(props.sessionToken),
+      ledgerSummary(props.sessionToken, activeFilter.value),
+      projectBalances(props.sessionToken, activeFilter.value),
+    ]);
+    projects.value = projectRows;
+    summary.value = summaryValue;
+    balances.value = balancesValue;
+  } catch (error: any) {
+    errorMessage.value = String(error);
   } finally {
     loading.value = false;
   }
 }
 
-async function exportDonationsCsv() {
-  const dest = await save({
-    defaultPath: `contributions-${filterFrom.value || "all"}-${filterTo.value || "all"}.csv`,
-    filters: [{ name: "CSV", extensions: ["csv"] }],
-  });
-  if (!dest) return;
-  await exportCsv(props.sessionToken, { kind: "donations", filter: activeFilter.value, dest_path: dest });
-  notify("Contributions CSV exported.");
-}
-
-async function exportExpensesCsv() {
-  const dest = await save({
-    defaultPath: `expenses-${filterFrom.value || "all"}-${filterTo.value || "all"}.csv`,
-    filters: [{ name: "CSV", extensions: ["csv"] }],
-  });
-  if (!dest) return;
-  await exportCsv(props.sessionToken, { kind: "expenses", filter: activeFilter.value, dest_path: dest });
-  notify("Expenses CSV exported.");
-}
-
-async function exportProjectsCsv() {
-  const dest = await save({
-    defaultPath: `projects.csv`,
-    filters: [{ name: "CSV", extensions: ["csv"] }],
-  });
-  if (!dest) return;
-  await exportCsv(props.sessionToken, { kind: "projects", filter: activeFilter.value, dest_path: dest });
-  notify("Projects CSV exported.");
-}
-
 async function exportSummaryPdf() {
   const dest = await save({
-    defaultPath: `summary-${filterFrom.value || "all"}-${filterTo.value || "all"}.pdf`,
+    defaultPath: `reports-${filterFrom.value || "all"}-${filterTo.value || "all"}.pdf`,
     filters: [{ name: "PDF", extensions: ["pdf"] }],
   });
   if (!dest) return;
-  await exportPdf(props.sessionToken, { title: "Project Funds Tracker — Summary", filter: activeFilter.value, dest_path: dest });
+  await exportPdf(props.sessionToken, {
+    title: "Church Ledger - Reports & Export",
+    filter: activeFilter.value,
+    dest_path: dest,
+  });
   notify("PDF summary exported.");
+}
+
+async function exportSummaryCsv() {
+  const dest = await save({
+    defaultPath: `reports-${filterFrom.value || "all"}-${filterTo.value || "all"}.csv`,
+    filters: [{ name: "CSV", extensions: ["csv"] }],
+  });
+  if (!dest) return;
+  await exportCsv(props.sessionToken, {
+    kind: "projects",
+    filter: activeFilter.value,
+    dest_path: dest,
+  });
+  notify("CSV exported.");
+}
+
+function printReport() {
+  window.print();
+}
+
+function generateReport() {
+  load();
 }
 
 onMounted(load);
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div v-if="errorMessage" class="rounded-xl border border-rose-500/40 bg-rose-500/10 p-4 text-rose-200">
-      {{ errorMessage }}
-    </div>
-
-    <div class="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-      <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+  <div class="space-y-5 text-[var(--ledger-text)]">
+    <section class="ledger-panel overflow-hidden rounded-[26px]">
+      <div class="flex flex-col gap-5 border-b border-[color:var(--ledger-line)] px-6 py-5 lg:flex-row lg:items-start lg:justify-between print:border-b-0">
         <div>
-          <div class="font-semibold">Filters</div>
-          <div class="text-sm text-slate-400">Use date range and/or project, then refresh</div>
+          <p class="ledger-eyebrow text-[11px] text-[var(--ledger-muted)]">
+            BOOK OF ACCOUNTS · FY 2026
+          </p>
+          <h2 class="ledger-heading mt-2 text-4xl text-[var(--ledger-text)]">
+            Reports &amp; Export
+          </h2>
+          <p class="mt-3 max-w-2xl text-sm text-[var(--ledger-muted)]">
+            Statement of receipts and disbursements for the selected period.
+          </p>
         </div>
-        <div class="flex flex-wrap items-end gap-2">
-          <div>
-            <div class="text-xs text-slate-400 mb-1">From</div>
-            <input v-model="filterFrom" type="date" class="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <div class="text-xs text-slate-400 mb-1">To</div>
-            <input v-model="filterTo" type="date" class="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <div class="text-xs text-slate-400 mb-1">Project</div>
-            <select v-model="filterProjectId" class="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm">
-              <option value="">All</option>
-              <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ p.name }}</option>
-            </select>
-          </div>
-          <button class="rounded-lg bg-slate-800 hover:bg-slate-700 px-3 py-2 text-sm font-semibold" @click="load">
-            {{ loading ? "Refreshing…" : "Refresh" }}
+
+        <div class="flex flex-wrap gap-2 print:hidden">
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 rounded-[12px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-4 py-3 text-sm font-semibold text-[var(--ledger-text)] transition hover:bg-[rgba(255,255,255,0.95)]"
+            @click="printReport"
+          >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M6 9V2h12v7" />
+              <path d="M6 18H5a3 3 0 0 1-3-3v-3a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v3a3 3 0 0 1-3 3h-1" />
+              <path d="M6 14h12v8H6z" />
+            </svg>
+            <span>Print</span>
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 rounded-[12px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-4 py-3 text-sm font-semibold text-[var(--ledger-text)] transition hover:bg-[rgba(255,255,255,0.95)]"
+            @click="exportSummaryCsv"
+          >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+              <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z" />
+              <path d="M9 13h6" />
+              <path d="M9 17h6" />
+            </svg>
+            <span>CSV</span>
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 rounded-[12px] border border-[var(--ledger-red)] bg-[var(--ledger-red)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#a73d24]"
+            @click="exportSummaryPdf"
+          >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+              <path d="M6 2h8l6 6v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" />
+              <path d="M9 13h6" />
+              <path d="M9 17h6" />
+            </svg>
+            <span>PDF</span>
           </button>
         </div>
       </div>
 
-      <div class="mt-4 flex flex-wrap gap-2">
-        <button class="rounded-lg bg-indigo-600 hover:bg-indigo-500 px-3 py-2 text-sm font-semibold" @click="exportSummaryPdf">
-          Export PDF Summary
-        </button>
-        <button class="rounded-lg bg-slate-800 hover:bg-slate-700 px-3 py-2 text-sm font-semibold" @click="exportDonationsCsv">
-          Export Contributions CSV
-        </button>
-        <button class="rounded-lg bg-slate-800 hover:bg-slate-700 px-3 py-2 text-sm font-semibold" @click="exportExpensesCsv">
-          Export Expenses CSV
-        </button>
-        <button class="rounded-lg bg-slate-800 hover:bg-slate-700 px-3 py-2 text-sm font-semibold" @click="exportProjectsCsv">
-          Export Projects CSV
-        </button>
-      </div>
-    </div>
+      <div class="px-4 py-4 print:px-0 print:pt-0">
+        <section class="ledger-card rounded-[4px] p-4 print:hidden">
+          <div class="grid gap-3 xl:grid-cols-[1.1fr_1fr_1fr_1fr_auto]">
+            <label class="grid gap-2">
+              <span class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--ledger-muted)]">
+                Report Type
+              </span>
+              <select
+                v-model="reportType"
+                class="h-12 rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-3 text-sm text-[var(--ledger-text)] outline-none transition focus:border-[color:var(--ledger-gold)]"
+              >
+                <option value="statement">Statement of Receipts &amp; Disbursements</option>
+                <option value="summary">Summary by Project</option>
+                <option value="balance">Balance Sheet View</option>
+              </select>
+            </label>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div class="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-        <div class="text-xs uppercase tracking-wider text-slate-400">Contributions</div>
-        <div class="mt-2 text-2xl font-bold">{{ formatPHPFromCents(summary?.total_donations_cents || 0) }}</div>
-      </div>
-      <div class="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-        <div class="text-xs uppercase tracking-wider text-slate-400">Expenses</div>
-        <div class="mt-2 text-2xl font-bold">{{ formatPHPFromCents(summary?.total_expenses_cents || 0) }}</div>
-      </div>
-      <div class="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-        <div class="text-xs uppercase tracking-wider text-slate-400">Balance</div>
-        <div class="mt-2 text-2xl font-bold">{{ formatPHPFromCents(summary?.balance_cents || 0) }}</div>
-      </div>
-    </div>
+            <label class="grid gap-2">
+              <span class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--ledger-muted)]">
+                From
+              </span>
+              <input
+                v-model="filterFrom"
+                type="date"
+                class="h-12 rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-3 text-sm text-[var(--ledger-text)] outline-none transition focus:border-[color:var(--ledger-gold)]"
+              />
+            </label>
 
-    <div class="rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden">
-      <div class="p-5">
-        <div class="font-semibold">Project Balances</div>
-        <div class="text-sm text-slate-400">Computed from contributions and expenses within the filter</div>
+            <label class="grid gap-2">
+              <span class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--ledger-muted)]">
+                To
+              </span>
+              <input
+                v-model="filterTo"
+                type="date"
+                class="h-12 rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-3 text-sm text-[var(--ledger-text)] outline-none transition focus:border-[color:var(--ledger-gold)]"
+              />
+            </label>
+
+            <label class="grid gap-2">
+              <span class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--ledger-muted)]">
+                Project
+              </span>
+              <select
+                v-model="filterProjectId"
+                class="h-12 rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-3 text-sm text-[var(--ledger-text)] outline-none transition focus:border-[color:var(--ledger-gold)]"
+              >
+                <option value="">All projects</option>
+                <option v-for="project in projects" :key="project.id" :value="String(project.id)">
+                  {{ project.name }}
+                </option>
+              </select>
+            </label>
+
+            <button
+              type="button"
+              class="mt-auto inline-flex h-12 items-center justify-center rounded-[4px] bg-[var(--ledger-navy)] px-5 text-sm font-semibold text-white transition hover:bg-[var(--ledger-navy-2)]"
+              @click="generateReport"
+            >
+              {{ loading ? "Generating..." : "Generate" }}
+            </button>
+          </div>
+        </section>
+
+        <div v-if="errorMessage" class="mt-4 rounded-[4px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {{ errorMessage }}
+        </div>
+
+        <template v-if="!loading">
+          <section class="mt-4 grid gap-4 md:grid-cols-3 print:mt-0">
+            <article class="ledger-card rounded-[4px] p-5">
+              <div class="ledger-eyebrow text-[11px] text-[var(--ledger-muted)]">Total Receipts</div>
+              <div class="mt-4 text-2xl font-semibold tracking-tight text-[var(--ledger-green)]">
+                {{ formatPHPFromCents(summary?.total_donations_cents || 0) }}
+              </div>
+            </article>
+
+            <article class="ledger-card rounded-[4px] p-5">
+              <div class="ledger-eyebrow text-[11px] text-[var(--ledger-muted)]">Total Disbursements</div>
+              <div class="mt-4 text-2xl font-semibold tracking-tight text-[var(--ledger-red)]">
+                {{ formatPHPFromCents(summary?.total_expenses_cents || 0) }}
+              </div>
+            </article>
+
+            <article class="ledger-card rounded-[4px] p-5">
+              <div class="ledger-eyebrow text-[11px] text-[var(--ledger-muted)]">Ending Balance</div>
+              <div class="mt-4 text-2xl font-semibold tracking-tight text-[var(--ledger-text)]">
+                {{ formatSignedMoney(summary?.balance_cents || 0) }}
+              </div>
+              <div class="mt-2 text-sm text-[var(--ledger-muted)]">
+                {{ reportRows.length }} entries
+              </div>
+            </article>
+          </section>
+
+          <section class="ledger-panel mt-4 overflow-hidden rounded-[4px]">
+            <div class="border-b border-[color:var(--ledger-line)] px-4 py-6 text-center">
+              <div class="ledger-eyebrow text-[11px] text-[var(--ledger-muted)]">
+                GRACE COMMUNITY CHURCH · FINANCE OFFICE
+              </div>
+              <h3 class="ledger-heading mt-2 text-2xl text-[var(--ledger-text)]">
+                Statement of Receipts and Disbursements
+              </h3>
+              <p class="mt-1 text-xs text-[var(--ledger-muted)]">
+                {{ reportRangeLabel }}
+              </p>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[900px] border-separate border-spacing-0">
+                <thead>
+                  <tr class="bg-[rgba(240,229,203,0.85)] text-[11px] uppercase tracking-[0.28em] text-[var(--ledger-text)]">
+                    <th class="border-b border-[color:var(--ledger-line)] px-4 py-3 text-left font-semibold">Project</th>
+                    <th class="border-b border-[color:var(--ledger-line)] px-4 py-3 text-right font-semibold">Target</th>
+                    <th class="border-b border-[color:var(--ledger-line)] px-4 py-3 text-right font-semibold">Receipts</th>
+                    <th class="border-b border-[color:var(--ledger-line)] px-4 py-3 text-right font-semibold">Disbursements</th>
+                    <th class="border-b border-[color:var(--ledger-line)] px-4 py-3 text-right font-semibold">Balance</th>
+                    <th class="border-b border-[color:var(--ledger-line)] px-4 py-3 text-right font-semibold">% Funded</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <tr
+                    v-for="row in reportRows"
+                    :key="row.project_id"
+                    class="border-b border-[color:rgba(215,196,154,0.7)] bg-[rgba(251,247,235,0.92)] transition hover:bg-[rgba(247,241,224,0.95)]"
+                  >
+                    <td class="px-4 py-4">
+                      <div class="text-sm text-[var(--ledger-text)]">{{ row.project_name }}</div>
+                      <div class="mt-1 text-[11px] uppercase tracking-[0.22em] text-[var(--ledger-muted)]">
+                        {{ row.project_code }}
+                      </div>
+                    </td>
+                    <td class="px-4 py-4 text-right text-sm tabular-nums text-[var(--ledger-text)]">
+                      {{ formatPHPFromCents(row.target_cents) }}
+                    </td>
+                    <td class="px-4 py-4 text-right text-sm tabular-nums text-[var(--ledger-green)]">
+                      {{ formatPHPFromCents(row.donations_cents) }}
+                    </td>
+                    <td class="px-4 py-4 text-right text-sm tabular-nums text-[var(--ledger-red)]">
+                      {{ formatPHPFromCents(row.expenses_cents) }}
+                    </td>
+                    <td class="px-4 py-4 text-right text-sm tabular-nums text-[var(--ledger-text)]">
+                      {{ formatSignedMoney(row.balance_cents) }}
+                    </td>
+                    <td class="px-4 py-4 text-right text-sm tabular-nums text-[var(--ledger-text)]">
+                      {{ formatPercent(row.donations_cents, row.target_cents) }}
+                    </td>
+                  </tr>
+
+                  <tr v-if="reportRows.length === 0">
+                    <td colspan="6" class="px-4 py-10 text-center text-sm text-[var(--ledger-muted)]">
+                      No projects found for the selected period.
+                    </td>
+                  </tr>
+                </tbody>
+
+                <tfoot>
+                  <tr class="bg-[rgba(244,237,220,0.9)]">
+                    <th
+                      class="border-t border-[color:var(--ledger-line)] px-4 py-4 text-left text-[11px] uppercase tracking-[0.28em] text-[var(--ledger-text)]"
+                      colspan="1"
+                    >
+                      Grand Total (incl. General Fund)
+                    </th>
+                    <td class="border-t border-[color:var(--ledger-line)] px-4 py-4 text-right text-sm tabular-nums text-[var(--ledger-text)]">
+                      {{ formatPHPFromCents(totalTargetCents) }}
+                    </td>
+                    <td class="border-t border-[color:var(--ledger-line)] px-4 py-4 text-right text-sm tabular-nums text-[var(--ledger-green)]">
+                      {{ formatPHPFromCents(totalReceiptsCents) }}
+                    </td>
+                    <td class="border-t border-[color:var(--ledger-line)] px-4 py-4 text-right text-sm tabular-nums text-[var(--ledger-red)]">
+                      {{ formatPHPFromCents(totalDisbursementsCents) }}
+                    </td>
+                    <td class="border-t border-[color:var(--ledger-line)] px-4 py-4 text-right text-sm font-semibold tabular-nums text-[var(--ledger-text)]">
+                      {{ formatSignedMoney(endingBalanceCents) }}
+                    </td>
+                    <td class="border-t border-[color:var(--ledger-line)] px-4 py-4 text-right text-sm tabular-nums text-[var(--ledger-text)]">
+                      {{ formatPercent(totalReceiptsCents, totalTargetCents) }}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </section>
+
+          <section class="mt-4 grid gap-4 md:grid-cols-3 print:mt-4">
+            <div class="border-t border-[color:var(--ledger-line)] pt-8">
+              <div class="text-sm font-semibold uppercase tracking-[0.28em] text-[var(--ledger-text)]">
+                Prepared By - Treasurer
+              </div>
+            </div>
+            <div class="border-t border-[color:var(--ledger-line)] pt-8">
+              <div class="text-sm font-semibold uppercase tracking-[0.28em] text-[var(--ledger-text)]">
+                Audited By - Finance Committee
+              </div>
+            </div>
+            <div class="border-t border-[color:var(--ledger-line)] pt-8">
+              <div class="text-sm font-semibold uppercase tracking-[0.28em] text-[var(--ledger-text)]">
+                Approved By - Pastor
+              </div>
+            </div>
+          </section>
+        </template>
+
+        <div v-else class="mt-4 rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-4 py-6 text-sm text-[var(--ledger-muted)]">
+          Generating report...
+        </div>
       </div>
-      <div class="border-t border-slate-800">
-        <table class="w-full text-sm">
-          <thead class="bg-slate-950/40 text-slate-300">
-            <tr>
-              <th class="text-left p-3 font-medium">Project</th>
-              <th class="text-right p-3 font-medium">Contributions</th>
-              <th class="text-right p-3 font-medium">Expenses</th>
-              <th class="text-right p-3 font-medium">Balance</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in balances" :key="row.project_id" class="border-t border-slate-800">
-              <td class="p-3">{{ row.project_name }}</td>
-              <td class="p-3 text-right">{{ formatPHPFromCents(row.donations_cents) }}</td>
-              <td class="p-3 text-right">{{ formatPHPFromCents(row.expenses_cents) }}</td>
-              <td class="p-3 text-right font-semibold">{{ formatPHPFromCents(row.balance_cents) }}</td>
-            </tr>
-            <tr v-if="balances.length === 0" class="border-t border-slate-800">
-              <td class="p-3 text-slate-400" colspan="4">No projects found.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    </section>
   </div>
 </template>

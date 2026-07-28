@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { Moon, Sun } from "lucide-vue-next";
 import { appStatus, bootstrapAdmin, login, logout, resetAdminPassword } from "./lib/api";
 import { notify } from "./lib/feedback";
 import SetupAdmin from "./components/SetupAdmin.vue";
@@ -129,10 +130,13 @@ onMounted(async () => {
   <div :class="themeMode === 'dark' ? 'h-full overflow-hidden bg-slate-950 text-slate-100' : 'h-full overflow-hidden bg-slate-50 text-slate-900'">
     <button
       type="button"
-      class="fixed right-4 top-4 z-50 rounded-[2px] border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm"
+      class="fixed right-4 top-4 z-50 inline-flex h-10 w-10 items-center justify-center rounded-[2px] border border-slate-300 bg-white text-slate-900 shadow-sm transition hover:bg-slate-50"
+      :aria-label="themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+      :title="themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
       @click="toggleTheme"
     >
-      {{ themeMode === 'dark' ? 'Light mode' : 'Dark mode' }}
+      <Sun v-if="themeMode === 'dark'" class="h-4 w-4" />
+      <Moon v-else class="h-4 w-4" />
     </button>
 
     <div
@@ -169,7 +173,7 @@ onMounted(async () => {
         @reset-password="handleResetPassword"
       />
 
-      <MainApp v-else :session-token="sessionToken!" @logout="handleLogout" />
+      <MainApp v-else :session-token="sessionToken!" :theme-mode="themeMode" @logout="handleLogout" />
     </div>
   </div>
 </template>

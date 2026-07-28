@@ -668,6 +668,30 @@ pub fn backup_restore(session_token: String, src_path: String, state: State<'_, 
     Ok(())
 }
 
+#[tauri::command]
+pub fn database_health(session_token: String, state: State<'_, AppState>) -> Result<DatabaseHealth, String> {
+    require_session(&state, &session_token).map_err(map_err)?;
+    let health = with_conn(&state, |conn| {
+        let integrity_result: String = conn.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+        let integrity_ok = integrity_result.trim().eq_ignore_ascii_case("ok");
+
+        let mut record_count = 0i64;
+        for table in ["meta", "admins", "donors", "projects", "categories", "donations", "expenses"] {
+            let sql = format!("SELECT COUNT(*) FROM {table}");
+            let count: i64 = conn.query_row(&sql, [], |row| row.get(0))?;
+            record_count += count;
+        }
+
+        Ok(DatabaseHealth {
+            integrity_ok,
+            checked_at: db::now_iso(),
+            record_count,
+        })
+    })
+    .map_err(map_err)?;
+    Ok(health)
+}
+
 fn validate_date(date: &str) -> Result<(), String> {
     // Minimal YYYY-MM-DD validation
     if date.len() != 10 {

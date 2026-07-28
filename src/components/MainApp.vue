@@ -10,7 +10,7 @@ import ReportsView from "./views/ReportsView.vue";
 import BackupsView from "./views/BackupsView.vue";
 import ProjectDetailView from "./views/ProjectDetailView.vue";
 
-const props = defineProps<{ sessionToken: string }>();
+const props = defineProps<{ sessionToken: string; themeMode: "light" | "dark" }>();
 const emit = defineEmits<{ (e: "logout"): void }>();
 
 type Tab = "overview" | "donations" | "expenses" | "projects" | "reports" | "backups";
@@ -324,6 +324,7 @@ function toggleSidebar() {
           v-else-if="tab === 'project_detail' && selectedProjectId != null"
           :session-token="sessionToken"
           :project-id="selectedProjectId"
+          :theme-mode="themeMode"
           @back="backToProjects"
         />
       </main>

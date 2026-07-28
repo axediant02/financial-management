@@ -113,3 +113,9 @@ export type BackupInfo = {
   created_at: string;
   bytes: number;
 };
+
+export type DatabaseHealth = {
+  integrity_ok: boolean;
+  checked_at: string;
+  record_count: number;
+};
