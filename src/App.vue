@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { Moon, Sun } from "lucide-vue-next";
-import { appStatus, bootstrapAdmin, login, logout, resetAdminPassword } from "./lib/api";
+import { appStatus, bootstrapAdmin, login, logout } from "./lib/api";
 import { notify } from "./lib/feedback";
 import SetupAdmin from "./components/SetupAdmin.vue";
 import LoginPage from "./components/LoginPage.vue";
+import ForgotPasswordPage from "./components/ForgotPasswordPage.vue";
 import MainApp from "./components/MainApp.vue";
 
 const THEME_KEY = "pft_theme_mode";
@@ -18,6 +19,7 @@ const errorMessage = ref<string | null>(null);
 const toast = ref<string | null>(null);
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 const themeMode = ref<"light" | "dark">(localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light");
+const authScreen = ref<"login" | "forgot">("login");
 
 const isAuthed = computed(() => !!sessionToken.value);
 
@@ -61,10 +63,24 @@ function handleLoginSuccess(token: string) {
   notify("Logged in.");
 }
 
+function handleOpenForgotPassword() {
+  authScreen.value = "forgot";
+}
+
+function handleBackToLogin() {
+  authScreen.value = "login";
+}
+
+function handlePasswordReplaced() {
+  authScreen.value = "login";
+  notify("Password replaced. Sign in with the new password.");
+}
+
 async function handleLogout() {
   errorMessage.value = null;
   const token = sessionToken.value;
   sessionToken.value = null;
+  authScreen.value = "login";
   localStorage.removeItem("pft_session_token");
   localStorage.removeItem("pft_nav_tab");
   localStorage.removeItem("pft_nav_project_id");
@@ -76,21 +92,6 @@ async function handleLogout() {
     }
   }
   notify("Logged out.");
-}
-
-async function handleResetPassword() {
-  errorMessage.value = null;
-  try {
-    await resetAdminPassword();
-    sessionToken.value = null;
-    localStorage.removeItem("pft_session_token");
-    localStorage.removeItem("pft_nav_tab");
-    localStorage.removeItem("pft_nav_project_id");
-    await refreshStatus();
-    notify("Admin password reset.");
-  } catch (e: any) {
-    errorMessage.value = String(e);
-  }
 }
 
 watch(themeMode, () => {
@@ -168,9 +169,15 @@ onMounted(async () => {
       />
 
       <LoginPage
-        v-else-if="!isAuthed"
+        v-else-if="!isAuthed && authScreen === 'login'"
         @login-success="handleLoginSuccess"
-        @reset-password="handleResetPassword"
+        @forgot-password="handleOpenForgotPassword"
+      />
+
+      <ForgotPasswordPage
+        v-else-if="!isAuthed && authScreen === 'forgot'"
+        @back-to-login="handleBackToLogin"
+        @password-replaced="handlePasswordReplaced"
       />
 
       <MainApp v-else :session-token="sessionToken!" :theme-mode="themeMode" @logout="handleLogout" />

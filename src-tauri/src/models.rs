@@ -13,6 +13,12 @@ pub struct AuthResult {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct PasswordReplaceChallenge {
+    pub code: String,
+    pub expires_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct IdResult {
     pub id: i64,
 }

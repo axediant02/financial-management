@@ -1,18 +1,16 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { login, resetAdminPassword } from "../lib/api";
+import { login } from "../lib/api";
 
 const emit = defineEmits<{
   (e: "login-success", sessionToken: string): void;
-  (e: "reset-password"): void;
+  (e: "forgot-password"): void;
 }>();
 
 const password = ref("");
 const submitting = ref(false);
 const errorMessage = ref<string | null>(null);
 const successMessage = ref<string | null>(null);
-const resetConfirm = ref("");
-const resetting = ref(false);
 
 async function handleLogin() {
   errorMessage.value = null;
@@ -28,25 +26,6 @@ async function handleLogin() {
     errorMessage.value = "Login failed. Check your password and try again.";
   } finally {
     submitting.value = false;
-  }
-}
-
-async function handleReset() {
-  errorMessage.value = null;
-  if (resetConfirm.value.trim().toUpperCase() !== "RESET") {
-    errorMessage.value = 'Type RESET to confirm password reset.';
-    return;
-  }
-
-  resetting.value = true;
-  try {
-    await resetAdminPassword();
-    emit("reset-password");
-    resetConfirm.value = "";
-  } catch (e: any) {
-    errorMessage.value = String(e);
-  } finally {
-    resetting.value = false;
   }
 }
 </script>
@@ -114,35 +93,16 @@ async function handleReset() {
         </form>
 
         <div class="mt-8 border-t border-slate-700/60 pt-6">
-          <div class="text-sm font-semibold text-slate-200">Forgot password?</div>
+          <button
+            type="button"
+            class="text-sm font-semibold text-emerald-200 hover:text-emerald-100 transition-colors"
+            @click="emit('forgot-password')"
+          >
+            Forgot password?
+          </button>
           <p class="mt-1 text-xs text-slate-400">
-            This clears the current admin password only. Your data stays intact.
+            Open the replacement flow to generate a one-time code and set a new password.
           </p>
-
-          <div class="mt-4 space-y-3">
-            <div>
-              <label for="resetConfirm" class="block text-xs font-medium text-slate-300 mb-2">
-                Type RESET to confirm
-              </label>
-              <input
-                v-model="resetConfirm"
-                id="resetConfirm"
-                type="text"
-                autocomplete="off"
-                placeholder="RESET"
-                class="w-full bg-slate-900/50 border border-slate-600 rounded-xl py-3 px-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all uppercase"
-              />
-            </div>
-
-            <button
-              type="button"
-              :disabled="resetting"
-              class="w-full rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-200 font-semibold py-3 px-4 hover:bg-rose-500/20 disabled:opacity-60 transition-all duration-200"
-              @click="handleReset"
-            >
-              {{ resetting ? "Resetting..." : "Reset admin password" }}
-            </button>
-          </div>
         </div>
       </div>
     </div>

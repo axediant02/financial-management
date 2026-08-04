@@ -13,6 +13,7 @@ import type {
   ProjectReport,
   Project,
   ProjectBalanceRow,
+  PasswordReplaceChallenge,
 } from "./types";
 
 function isUnauthorizedError(e: unknown): boolean {
@@ -45,8 +46,15 @@ export async function bootstrapAdmin(password: string): Promise<void> {
   await invoke("bootstrap_admin", { password });
 }
 
-export async function resetAdminPassword(): Promise<void> {
-  await invoke("reset_admin_password");
+export async function requestAdminPasswordReplace(): Promise<PasswordReplaceChallenge> {
+  return await invoke("request_admin_password_replace");
+}
+
+export async function completeAdminPasswordReplace(
+  code: string,
+  new_password: string,
+): Promise<void> {
+  await invoke("complete_admin_password_replace", { code, newPassword: new_password });
 }
 
 export async function login(password: string): Promise<AuthResult> {

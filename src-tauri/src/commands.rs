@@ -50,12 +50,21 @@ pub fn bootstrap_admin(password: String, state: State<'_, AppState>) -> Result<(
 }
 
 #[tauri::command]
-pub fn reset_admin_password(state: State<'_, AppState>) -> Result<(), String> {
-    with_conn(&state, |conn| {
-        conn.execute("DELETE FROM admins", [])?;
-        Ok(())
-    })
-    .map_err(map_err)?;
+pub fn request_admin_password_replace(
+    state: State<'_, AppState>,
+) -> Result<PasswordReplaceChallenge, String> {
+    let challenge = with_conn(&state, |conn| auth::issue_password_replace_code(conn)).map_err(map_err)?;
+    Ok(challenge)
+}
+
+#[tauri::command]
+pub fn complete_admin_password_replace(
+    code: String,
+    new_password: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    with_conn(&state, |conn| auth::replace_admin_password(conn, &code, &new_password))
+        .map_err(map_err)?;
     state.sessions.clear();
     Ok(())
 }

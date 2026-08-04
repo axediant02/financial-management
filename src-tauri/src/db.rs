@@ -5,7 +5,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::error::{AppError, AppResult};
 
-pub const SCHEMA_VERSION: i64 = 1;
+pub const SCHEMA_VERSION: i64 = 2;
 
 pub fn open_db(path: &Path) -> AppResult<Connection> {
     let conn = Connection::open(path)?;
@@ -122,6 +122,25 @@ INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '1');
                 params![name, now],
             )?;
         }
+    }
+
+    if current_version < 2 {
+        conn.execute_batch(
+            r#"
+CREATE TABLE IF NOT EXISTS admin_password_resets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  used_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_password_resets_code ON admin_password_resets(code);
+CREATE INDEX IF NOT EXISTS idx_admin_password_resets_expires_at ON admin_password_resets(expires_at);
+
+INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '2');
+"#,
+        )?;
     }
 
     Ok(())

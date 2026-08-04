@@ -6,6 +6,11 @@ export type AppStatus = {
 
 export type AuthResult = { session_token: string };
 
+export type PasswordReplaceChallenge = {
+  code: string;
+  expires_at: string;
+};
+
 export type Donor = {
   id: number;
   name: string;
