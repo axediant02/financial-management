@@ -25,6 +25,8 @@ const formStatus = ref<"active" | "paused" | "completed">("active");
 const formStart = ref("");
 const formEnd = ref("");
 const formDescription = ref("");
+const startDateMax = computed(() => formEnd.value || undefined);
+const endDateMin = computed(() => formStart.value || undefined);
 
 function statusLabel(value: string) {
   if (value === "paused") return "on hold";
@@ -119,6 +121,10 @@ async function createProject() {
   const name = formName.value.trim();
   if (!name) {
     notify("Enter a project name first.");
+    return;
+  }
+  if (formStart.value && formEnd.value && formEnd.value < formStart.value) {
+    notify("End date cannot be earlier than start date.");
     return;
   }
   if (!confirm(`Save project "${name}"?`)) return;
@@ -423,11 +429,21 @@ onMounted(load);
             </div>
             <div class="md:col-span-1">
               <label class="mb-1 block text-xs uppercase tracking-[0.2em] text-[#6a6b5d]">Start</label>
-              <input v-model="formStart" type="date" class="w-full rounded-xl border border-[#d7c49a] bg-white px-3 py-2 text-[#243858] outline-none" />
+              <input
+                v-model="formStart"
+                type="date"
+                :max="startDateMax"
+                class="w-full rounded-xl border border-[#d7c49a] bg-white px-3 py-2 text-[#243858] outline-none"
+              />
             </div>
             <div class="md:col-span-1">
               <label class="mb-1 block text-xs uppercase tracking-[0.2em] text-[#6a6b5d]">End</label>
-              <input v-model="formEnd" type="date" class="w-full rounded-xl border border-[#d7c49a] bg-white px-3 py-2 text-[#243858] outline-none" />
+              <input
+                v-model="formEnd"
+                type="date"
+                :min="endDateMin"
+                class="w-full rounded-xl border border-[#d7c49a] bg-white px-3 py-2 text-[#243858] outline-none"
+              />
             </div>
             <div class="md:col-span-6">
               <label class="mb-1 block text-xs uppercase tracking-[0.2em] text-[#6a6b5d]">Description</label>
