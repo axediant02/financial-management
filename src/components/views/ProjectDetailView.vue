@@ -41,6 +41,7 @@ const props = defineProps<{
   sessionToken: string;
   projectId: number;
   themeMode: "light" | "dark";
+  backLabel: string;
 }>();
 
 const emit = defineEmits<{
@@ -294,6 +295,17 @@ onMounted(load);
     <section class="ledger-panel overflow-hidden rounded-[26px]">
       <div class="flex flex-col gap-5 border-b border-[color:var(--ledger-line)] px-6 py-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
+          <nav class="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-[var(--ledger-muted)]">
+            <button
+              type="button"
+              class="transition hover:text-[var(--ledger-text)]"
+              @click="emit('back')"
+            >
+              {{ backLabel }}
+            </button>
+            <span>/</span>
+            <span class="text-[var(--ledger-text)]">Project detail</span>
+          </nav>
           <p class="ledger-eyebrow text-[11px] text-[var(--ledger-muted)]">
             BOOK OF ACCOUNTS · FY 2026
           </p>

@@ -18,9 +18,11 @@ type DetailTab = Tab | "project_detail";
 
 const NAV_TAB_KEY = "pft_nav_tab";
 const NAV_PROJECT_KEY = "pft_nav_project_id";
+const NAV_PREV_TAB_KEY = "pft_nav_prev_tab";
 const SIDEBAR_KEY = "pft_sidebar_collapsed";
 const selectedProjectId = ref<number | null>(null);
 const tab = ref<DetailTab>("overview");
+const previousTab = ref<Exclude<DetailTab, "project_detail">>("overview");
 const sidebarCollapsed = ref(localStorage.getItem(SIDEBAR_KEY) === "true");
 
 function isDetailTab(value: string): value is DetailTab {
@@ -35,14 +37,29 @@ function isDetailTab(value: string): value is DetailTab {
   );
 }
 
+function isTab(value: string): value is Tab {
+  return (
+    value === "overview" ||
+    value === "donations" ||
+    value === "expenses" ||
+    value === "projects" ||
+    value === "reports" ||
+    value === "backups"
+  );
+}
+
 onMounted(() => {
   const savedTab = localStorage.getItem(NAV_TAB_KEY);
   const savedProjectId = localStorage.getItem(NAV_PROJECT_KEY);
+  const savedPrevTab = localStorage.getItem(NAV_PREV_TAB_KEY);
   if (savedTab && isDetailTab(savedTab)) {
     tab.value = savedTab;
   }
   if (savedProjectId && /^\d+$/.test(savedProjectId)) {
     selectedProjectId.value = Number(savedProjectId);
+  }
+  if (savedPrevTab && isTab(savedPrevTab)) {
+    previousTab.value = savedPrevTab;
   }
   if (tab.value === "project_detail" && selectedProjectId.value == null) {
     tab.value = "projects";
@@ -56,6 +73,7 @@ watch(
     localStorage.setItem(NAV_TAB_KEY, value);
     if (value !== "project_detail") {
       localStorage.removeItem(NAV_PROJECT_KEY);
+      localStorage.removeItem(NAV_PREV_TAB_KEY);
     }
   },
 );
@@ -100,12 +118,35 @@ function openExpenses() {
 }
 
 function openProjectDetail(id: number) {
+  if (tab.value !== "project_detail") {
+    previousTab.value = tab.value as Exclude<DetailTab, "project_detail">;
+    localStorage.setItem(NAV_PREV_TAB_KEY, previousTab.value);
+  }
   selectedProjectId.value = id;
   tab.value = "project_detail";
 }
 
-function backToProjects() {
-  tab.value = "projects";
+function backToPreviousTab() {
+  tab.value = previousTab.value;
+}
+
+function detailBackLabel() {
+  switch (previousTab.value) {
+    case "overview":
+      return "Dashboard";
+    case "donations":
+      return "Contributions";
+    case "expenses":
+      return "Expenses";
+    case "projects":
+      return "Projects";
+    case "reports":
+      return "Reports";
+    case "backups":
+      return "Backups";
+    default:
+      return "Previous page";
+  }
 }
 
 function toggleSidebar() {
@@ -325,7 +366,8 @@ function toggleSidebar() {
           :session-token="sessionToken"
           :project-id="selectedProjectId"
           :theme-mode="themeMode"
-          @back="backToProjects"
+          :back-label="detailBackLabel()"
+          @back="backToPreviousTab"
         />
       </main>
     </div>
