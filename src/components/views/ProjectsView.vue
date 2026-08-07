@@ -376,7 +376,7 @@ onMounted(load);
     <section class="rounded-[16px] border border-[#d7c49a] bg-[#f6efdf] px-5 py-4 text-sm text-[#5f6d82]">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-          Entries are recorded in Philippine Peso (PHP). All records stored locally.
+          Entries are recorded in Philippine Peso (PHP).
         </div>
         <div>
           Last verified balance 27 Jul 2026.

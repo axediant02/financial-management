@@ -141,7 +141,7 @@ onMounted(load);
             Backup &amp; Restore
           </h2>
           <p class="mt-3 max-w-2xl text-sm text-[var(--ledger-muted)]">
-            Snapshots of the local SQLite ledger. Nothing leaves this machine.
+            Snapshots of the ledger for backup and restore.
           </p>
         </div>
 
@@ -340,7 +340,7 @@ onMounted(load);
       </div>
 
       <div class="border-t border-[color:var(--ledger-line)] px-6 py-3 text-xs text-[var(--ledger-muted)]">
-        Entries are stored locally in SQLite. Latest backup count {{ retainedCopies }} and total archive size {{ formatBytes(totalSizeBytes) }}.
+        Latest backup count {{ retainedCopies }} and total archive size {{ formatBytes(totalSizeBytes) }}.
       </div>
     </section>
   </div>

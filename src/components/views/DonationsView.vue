@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { save } from "@tauri-apps/plugin-dialog";
 import {
   donationsCreate,
@@ -49,6 +49,7 @@ const formMethod = ref("Cash");
 const formReference = ref("");
 const formAmount = ref("");
 const donorInput = ref<HTMLInputElement | null>(null);
+const showContributionModal = ref(false);
 
 const donorsById = computed(() => new Map(donors.value.map((donor) => [donor.id, donor])));
 const projectsById = computed(() => new Map(projects.value.map((project) => [project.id, project])));
@@ -66,16 +67,6 @@ function formatDateLabel(value: string) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric",
-  }).format(parsed);
-}
-
-function formatFooterDate(value: string) {
-  const parsed = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
     year: "numeric",
   }).format(parsed);
 }
@@ -167,13 +158,6 @@ const totalContributions = computed(() =>
 
 const entryCount = computed(() => filteredEntries.value.length);
 
-const latestRecordedDate = computed(() => {
-  const latest = journalEntries.value[0];
-  return latest?.donated_at || getLocalDateString();
-});
-
-const lastBalanceLabel = computed(() => formatFooterDate(latestRecordedDate.value));
-
 function clearForm(keepIdentity = true) {
   formAmount.value = "";
   formReference.value = "";
@@ -186,6 +170,16 @@ function clearForm(keepIdentity = true) {
 
 function focusDonorField() {
   donorInput.value?.focus();
+}
+
+async function openContributionModal() {
+  showContributionModal.value = true;
+  await nextTick();
+  focusDonorField();
+}
+
+function closeContributionModal() {
+  showContributionModal.value = false;
 }
 
 async function load() {
@@ -268,6 +262,7 @@ async function submitContribution() {
 
     await load();
     clearForm(true);
+    closeContributionModal();
     notify("Contribution posted.");
   } catch (error: any) {
     errorMessage.value = String(error);
@@ -324,119 +319,7 @@ onMounted(load);
         </button>
       </div>
 
-      <div class="grid gap-4 px-4 py-4 lg:grid-cols-[340px_minmax(0,1fr)]">
-        <form
-          class="ledger-card rounded-[4px] p-5"
-          @submit.prevent="submitContribution"
-        >
-          <div class="ledger-eyebrow text-[11px] text-[var(--ledger-muted)]">
-            OFFICIAL RECEIPT ENTRY
-          </div>
-          <h3 class="ledger-heading mt-2 text-2xl text-[var(--ledger-text)]">
-            New Contribution
-          </h3>
-
-          <div class="mt-6 grid gap-4">
-            <label class="grid gap-2">
-              <span class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--ledger-muted)]">
-                Date
-              </span>
-              <input
-                v-model="formDate"
-                type="date"
-                class="h-12 rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-3 text-sm text-[var(--ledger-text)] outline-none transition focus:border-[color:var(--ledger-gold)]"
-              />
-            </label>
-
-            <label class="grid gap-2">
-              <span class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--ledger-muted)]">
-                Donor
-              </span>
-              <input
-                v-model="formDonorName"
-                ref="donorInput"
-                list="contribution-donors"
-                placeholder="Name of contributor"
-                class="h-12 rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-3 text-sm text-[var(--ledger-text)] outline-none transition placeholder:text-[var(--ledger-muted)] focus:border-[color:var(--ledger-gold)]"
-              />
-              <datalist id="contribution-donors">
-                <option v-for="donor in donors" :key="donor.id" :value="donor.name" />
-              </datalist>
-            </label>
-
-            <label class="grid gap-2">
-              <span class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--ledger-muted)]">
-                Project
-              </span>
-              <select
-                v-model="formProjectId"
-                class="h-12 rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-3 text-sm text-[var(--ledger-text)] outline-none transition focus:border-[color:var(--ledger-gold)]"
-              >
-                <option value="">General Fund (unassigned)</option>
-                <option v-for="project in projects" :key="project.id" :value="String(project.id)">
-                  {{ project.name }}
-                </option>
-              </select>
-            </label>
-
-            <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-              <label class="grid min-w-0 gap-2">
-                <span class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--ledger-muted)]">
-                  Method
-                </span>
-                <select
-                  v-model="formMethod"
-                  class="h-12 w-full min-w-0 rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-3 text-sm text-[var(--ledger-text)] outline-none transition focus:border-[color:var(--ledger-gold)]"
-                >
-                  <option>Cash</option>
-                  <option>GCash</option>
-                  <option>Bank</option>
-                  <option>Check</option>
-                </select>
-              </label>
-
-              <label class="grid min-w-0 gap-2">
-                <span class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--ledger-muted)]">
-                  OR / REF
-                </span>
-                <input
-                  v-model="formReference"
-                  placeholder="OR-10232"
-                  class="h-12 w-full min-w-0 rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-3 text-sm text-[var(--ledger-text)] outline-none transition placeholder:text-[var(--ledger-muted)] focus:border-[color:var(--ledger-gold)]"
-                />
-              </label>
-            </div>
-
-            <label class="grid gap-2">
-              <span class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--ledger-muted)]">
-                Amount (PHP)
-              </span>
-              <input
-                v-model="formAmount"
-                inputmode="decimal"
-                placeholder="0.00"
-                class="h-12 rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-3 text-right text-sm font-medium text-[var(--ledger-text)] outline-none transition placeholder:text-[var(--ledger-muted)] focus:border-[color:var(--ledger-gold)]"
-              />
-            </label>
-
-            <button
-              type="submit"
-              :disabled="saving"
-              class="inline-flex h-12 items-center justify-center gap-2 rounded-[4px] bg-[var(--ledger-navy)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--ledger-navy-2)] disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M5 12h14" />
-                <path d="m12 5 7 7-7 7" />
-              </svg>
-              <span>{{ saving ? "Posting..." : "Post Contribution" }}</span>
-            </button>
-
-            <p class="text-center text-xs leading-5 text-[var(--ledger-muted)]">
-              Saved to the local database. Press Enter to post and start a new line.
-            </p>
-          </div>
-        </form>
-
+      <div class="px-4 py-4">
         <section class="ledger-card overflow-hidden rounded-[4px]">
           <div class="flex flex-col gap-3 border-b border-[color:var(--ledger-line)] px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -570,17 +453,146 @@ onMounted(load);
       </div>
     </section>
 
-    <p class="px-1 text-xs text-[var(--ledger-muted)]">
-      Entries are recorded in Philippine Peso (PHP). All records stored locally - last verified balance
-      {{ lastBalanceLabel }}.
-    </p>
+    <div
+      v-if="showContributionModal"
+      class="fixed inset-0 z-40 flex items-center justify-center bg-[rgba(15,23,42,0.48)] p-4"
+      @click.self="closeContributionModal"
+    >
+      <form
+        class="ledger-card max-h-[90vh] w-full max-w-[560px] overflow-y-auto rounded-[10px] p-5 shadow-[0_24px_80px_rgba(15,23,42,0.35)]"
+        @submit.prevent="submitContribution"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <div class="ledger-eyebrow text-[11px] text-[var(--ledger-muted)]">
+              OFFICIAL RECEIPT ENTRY
+            </div>
+            <h3 class="ledger-heading mt-2 text-2xl text-[var(--ledger-text)]">
+              New Contribution
+            </h3>
+          </div>
+
+          <button
+            type="button"
+            class="inline-flex h-10 w-10 items-center justify-center rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] text-[var(--ledger-text)] transition hover:bg-white"
+            aria-label="Close contribution form"
+            @click="closeContributionModal"
+          >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="m6 6 12 12" />
+              <path d="M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="mt-6 grid gap-4">
+          <label class="grid gap-2">
+            <span class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--ledger-muted)]">
+              Date
+            </span>
+            <input
+              v-model="formDate"
+              type="date"
+              class="h-12 rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-3 text-sm text-[var(--ledger-text)] outline-none transition focus:border-[color:var(--ledger-gold)]"
+            />
+          </label>
+
+          <label class="grid gap-2">
+            <span class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--ledger-muted)]">
+              Donor
+            </span>
+            <input
+              v-model="formDonorName"
+              ref="donorInput"
+              list="contribution-donors"
+              placeholder="Name of contributor"
+              class="h-12 rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-3 text-sm text-[var(--ledger-text)] outline-none transition placeholder:text-[var(--ledger-muted)] focus:border-[color:var(--ledger-gold)]"
+            />
+            <datalist id="contribution-donors">
+              <option v-for="donor in donors" :key="donor.id" :value="donor.name" />
+            </datalist>
+          </label>
+
+          <label class="grid gap-2">
+            <span class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--ledger-muted)]">
+              Project
+            </span>
+            <select
+              v-model="formProjectId"
+              class="h-12 rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-3 text-sm text-[var(--ledger-text)] outline-none transition focus:border-[color:var(--ledger-gold)]"
+            >
+              <option value="">General Fund (unassigned)</option>
+              <option v-for="project in projects" :key="project.id" :value="String(project.id)">
+                {{ project.name }}
+              </option>
+            </select>
+          </label>
+
+          <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <label class="grid min-w-0 gap-2">
+              <span class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--ledger-muted)]">
+                Method
+              </span>
+              <select
+                v-model="formMethod"
+                class="h-12 w-full min-w-0 rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-3 text-sm text-[var(--ledger-text)] outline-none transition focus:border-[color:var(--ledger-gold)]"
+              >
+                <option>Cash</option>
+                <option>GCash</option>
+                <option>Bank</option>
+                <option>Check</option>
+              </select>
+            </label>
+
+            <label class="grid min-w-0 gap-2">
+              <span class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--ledger-muted)]">
+                OR / REF
+              </span>
+              <input
+                v-model="formReference"
+                placeholder="OR-10232"
+                class="h-12 w-full min-w-0 rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-3 text-sm text-[var(--ledger-text)] outline-none transition placeholder:text-[var(--ledger-muted)] focus:border-[color:var(--ledger-gold)]"
+              />
+            </label>
+          </div>
+
+          <label class="grid gap-2">
+            <span class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--ledger-muted)]">
+              Amount (PHP)
+            </span>
+            <input
+              v-model="formAmount"
+              inputmode="decimal"
+              placeholder="0.00"
+              class="h-12 rounded-[4px] border border-[color:var(--ledger-line)] bg-[rgba(255,250,240,0.9)] px-3 text-right text-sm font-medium text-[var(--ledger-text)] outline-none transition placeholder:text-[var(--ledger-muted)] focus:border-[color:var(--ledger-gold)]"
+            />
+          </label>
+
+          <button
+            type="submit"
+            :disabled="saving"
+            class="inline-flex h-12 items-center justify-center gap-2 rounded-[4px] bg-[var(--ledger-navy)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--ledger-navy-2)] disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M5 12h14" />
+              <path d="m12 5 7 7-7 7" />
+            </svg>
+            <span>{{ saving ? "Posting..." : "Post Contribution" }}</span>
+          </button>
+
+          <p class="text-center text-xs leading-5 text-[var(--ledger-muted)]">
+            Press Enter to post and start a new line.
+          </p>
+        </div>
+      </form>
+    </div>
 
     <div class="fixed bottom-5 right-5 z-20">
       <button
         type="button"
         class="flex h-14 w-14 items-center justify-center rounded-[18px] bg-[var(--ledger-navy)] text-white shadow-[0_18px_40px_rgba(20,35,60,0.25)] transition hover:bg-[var(--ledger-navy-2)]"
         title="Quick add"
-        @click="focusDonorField"
+        @click="openContributionModal"
       >
         <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <path d="M12 5v14" />

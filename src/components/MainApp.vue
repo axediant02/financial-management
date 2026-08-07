@@ -298,15 +298,6 @@ function toggleSidebar() {
           <div class="space-y-3 rounded-[18px] border border-[#334b6d] bg-[rgba(18,31,53,0.9)] p-4">
             <div class="flex items-center gap-2 text-[#d8e0ec]" :class="sidebarCollapsed ? 'justify-center' : ''">
               <svg class="h-4 w-4 text-[#a8b6ca]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M4 20h16" />
-                <path d="M7 20V8" />
-                <path d="M12 20V5" />
-                <path d="M17 20v-9" />
-              </svg>
-              <span v-if="!sidebarCollapsed">Offline - local SQLite</span>
-            </div>
-            <div class="flex items-center gap-2 text-[#d8e0ec]" :class="sidebarCollapsed ? 'justify-center' : ''">
-              <svg class="h-4 w-4 text-[#a8b6ca]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <path d="M6 10V8a6 6 0 1 1 12 0v2" />
                 <rect x="5" y="10" width="14" height="10" rx="2" />
               </svg>

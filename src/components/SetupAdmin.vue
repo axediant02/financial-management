@@ -95,7 +95,7 @@ async function submit() {
         </form>
       </div>
       <p class="mt-4 text-center text-xs text-slate-500">
-        Offline-only • SQLite local database • Currency: PHP
+        Currency: PHP
       </p>
     </div>
   </div>
