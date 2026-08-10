@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { Moon, Sun } from "lucide-vue-next";
 import { appStatus, bootstrapAdmin, login, logout } from "./lib/api";
 import { notify } from "./lib/feedback";
+import DownloadPage from "./components/DownloadPage.vue";
 import SetupAdmin from "./components/SetupAdmin.vue";
 import LoginPage from "./components/LoginPage.vue";
 import ForgotPasswordPage from "./components/ForgotPasswordPage.vue";
@@ -20,8 +21,10 @@ const toast = ref<string | null>(null);
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 const themeMode = ref<"light" | "dark">(localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light");
 const authScreen = ref<"login" | "forgot">("login");
+const currentPath = ref(window.location.pathname);
 
 const isAuthed = computed(() => !!sessionToken.value);
+const isDownloadRoute = computed(() => currentPath.value === "/download" || currentPath.value === "/download/");
 
 function showToast(message: string) {
   toast.value = message;
@@ -100,7 +103,14 @@ watch(themeMode, () => {
 });
 
 onMounted(async () => {
+  window.addEventListener("popstate", () => {
+    currentPath.value = window.location.pathname;
+  });
   applyTheme();
+  if (isDownloadRoute.value) {
+    loading.value = false;
+    return;
+  }
   window.addEventListener("pft:toast", (event: Event) => {
     const detail = (event as CustomEvent).detail;
     if (typeof detail === "string" && detail.trim()) {
@@ -128,7 +138,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div :class="themeMode === 'dark' ? 'h-full overflow-hidden bg-slate-950 text-slate-100' : 'h-full overflow-hidden bg-slate-50 text-slate-900'">
+  <DownloadPage v-if="isDownloadRoute" />
+
+  <div
+    v-else
+    :class="themeMode === 'dark' ? 'h-full overflow-hidden bg-slate-950 text-slate-100' : 'h-full overflow-hidden bg-slate-50 text-slate-900'"
+  >
     <button
       type="button"
       class="fixed right-4 top-4 z-50 inline-flex h-10 w-10 items-center justify-center rounded-[2px] border border-slate-300 bg-white text-slate-900 shadow-sm transition hover:bg-slate-50"
