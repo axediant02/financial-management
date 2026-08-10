@@ -112,6 +112,10 @@ function openProjects() {
   tab.value = "projects";
 }
 
+function openCreateRecord() {
+  tab.value = "projects";
+}
+
 function openDocumentation() {
   tab.value = "documentation";
 }
@@ -377,7 +381,7 @@ function toggleSidebar() {
           @create-project="tab = 'projects'"
           @open-project="openProjectDetail"
           @open-projects="openProjects"
-          @open-donations="openDonations"
+          @open-create-record="openCreateRecord"
           @open-expenses="openExpenses"
         />
           <ProjectsView
