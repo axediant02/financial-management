@@ -35,6 +35,31 @@ export type Project = {
   created_at: string;
 };
 
+export type DocumentationRecord = {
+  id: number;
+  event_name: string;
+  event_date: string;
+  registration_collected_cents: number;
+  expenses_cents: number;
+  balance_cents: number;
+  notes?: string | null;
+  created_at: string;
+};
+
+export type DocumentationExpenseRow = {
+  id: number;
+  spent_at: string;
+  amount_cents: number;
+  payee?: string | null;
+  notes?: string | null;
+  created_at: string;
+};
+
+export type DocumentationDetail = {
+  documentation: DocumentationRecord;
+  expenses: DocumentationExpenseRow[];
+};
+
 export type Donation = {
   id: number;
   donated_at: string;

@@ -6,6 +6,7 @@ import OverviewDashboard from "./views/OverviewDashboard.vue";
 import DonationsView from "./views/DonationsView.vue";
 import ExpensesView from "./views/ExpensesView.vue";
 import ProjectsView from "./views/ProjectsView.vue";
+import DocumentationView from "./views/DocumentationView.vue";
 import ReportsView from "./views/ReportsView.vue";
 import BackupsView from "./views/BackupsView.vue";
 import ProjectDetailView from "./views/ProjectDetailView.vue";
@@ -13,7 +14,7 @@ import ProjectDetailView from "./views/ProjectDetailView.vue";
 const props = defineProps<{ sessionToken: string; themeMode: "light" | "dark" }>();
 const emit = defineEmits<{ (e: "logout"): void }>();
 
-type Tab = "overview" | "donations" | "expenses" | "projects" | "reports" | "backups";
+type Tab = "overview" | "donations" | "expenses" | "projects" | "documentation" | "reports" | "backups";
 type DetailTab = Tab | "project_detail";
 
 const NAV_TAB_KEY = "pft_nav_tab";
@@ -31,6 +32,7 @@ function isDetailTab(value: string): value is DetailTab {
     value === "donations" ||
     value === "expenses" ||
     value === "projects" ||
+    value === "documentation" ||
     value === "reports" ||
     value === "backups" ||
     value === "project_detail"
@@ -43,6 +45,7 @@ function isTab(value: string): value is Tab {
     value === "donations" ||
     value === "expenses" ||
     value === "projects" ||
+    value === "documentation" ||
     value === "reports" ||
     value === "backups"
   );
@@ -109,6 +112,10 @@ function openProjects() {
   tab.value = "projects";
 }
 
+function openDocumentation() {
+  tab.value = "documentation";
+}
+
 function openDonations() {
   tab.value = "donations";
 }
@@ -140,6 +147,8 @@ function detailBackLabel() {
       return "Expenses";
     case "projects":
       return "Projects";
+    case "documentation":
+      return "Documentation";
     case "reports":
       return "Reports";
     case "backups":
@@ -219,6 +228,25 @@ function toggleSidebar() {
               </svg>
             </span>
             <span v-if="!sidebarCollapsed">Projects</span>
+          </button>
+          <button
+            class="flex w-full items-center rounded-[10px] px-4 py-3 text-left text-sm font-semibold transition"
+            :class="[
+              tab === 'documentation' ? 'bg-[#31476a] text-white shadow-inner' : 'text-[#d8e0ec] hover:bg-white/5',
+              sidebarCollapsed ? 'justify-center gap-0' : 'gap-3',
+            ]"
+            @click="openDocumentation"
+            :title="sidebarCollapsed ? 'Documentation' : undefined"
+          >
+            <span class="flex h-5 w-5 items-center justify-center">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M6 4h9l3 3v13H6z" />
+                <path d="M15 4v4h4" />
+                <path d="M8 12h8" />
+                <path d="M8 16h8" />
+              </svg>
+            </span>
+            <span v-if="!sidebarCollapsed">Documentation</span>
           </button>
           <button
             class="flex w-full items-center rounded-[10px] px-4 py-3 text-left text-sm font-semibold transition"
@@ -352,10 +380,15 @@ function toggleSidebar() {
           @open-donations="openDonations"
           @open-expenses="openExpenses"
         />
-        <ProjectsView
+          <ProjectsView
           v-else-if="tab === 'projects'"
           :session-token="sessionToken"
           @open-project="openProjectDetail"
+          @open-documentation="openDocumentation"
+        />
+        <DocumentationView
+          v-else-if="tab === 'documentation'"
+          :session-token="sessionToken"
         />
         <ExpensesView v-else-if="tab === 'expenses'" :session-token="sessionToken" />
         <DonationsView v-else-if="tab === 'donations'" :session-token="sessionToken" />

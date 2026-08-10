@@ -4,6 +4,8 @@ import type {
   AuthResult,
   BackupInfo,
   Category,
+  DocumentationDetail,
+  DocumentationRecord,
   DateRangeFilter,
   Donation,
   Donor,
@@ -126,6 +128,50 @@ export async function projectsUpdate(
 
 export async function projectsDelete(session_token: string, id: number): Promise<void> {
   await invokeAuthed("projects_delete", { sessionToken: session_token, id });
+}
+
+export async function documentationsList(session_token: string): Promise<DocumentationRecord[]> {
+  return await invokeAuthed("documentations_list", { sessionToken: session_token });
+}
+
+export async function documentationDetail(
+  session_token: string,
+  id: number,
+): Promise<DocumentationDetail> {
+  return await invokeAuthed("documentation_detail", { sessionToken: session_token, id });
+}
+
+export async function documentationsCreate(
+  session_token: string,
+  payload: {
+    event_name: string;
+    event_date: string;
+    registration_collected_cents: number;
+    notes?: string | null;
+  },
+): Promise<{ id: number }> {
+  return await invokeAuthed("documentations_create", { sessionToken: session_token, payload });
+}
+
+export async function documentationExpensesCreate(
+  session_token: string,
+  payload: {
+    documentation_id: number;
+    spent_at: string;
+    amount_cents: number;
+    payee?: string | null;
+    notes?: string | null;
+  },
+): Promise<{ id: number }> {
+  return await invokeAuthed("documentation_expenses_create", { sessionToken: session_token, payload });
+}
+
+export async function documentationExpensesDelete(session_token: string, id: number): Promise<void> {
+  await invokeAuthed("documentation_expenses_delete", { sessionToken: session_token, id });
+}
+
+export async function documentationsDelete(session_token: string, id: number): Promise<void> {
+  await invokeAuthed("documentations_delete", { sessionToken: session_token, id });
 }
 
 export async function donationsList(

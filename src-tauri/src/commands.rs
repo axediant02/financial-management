@@ -310,6 +310,210 @@ pub fn projects_delete(
 }
 
 #[tauri::command]
+pub fn documentations_list(
+    session_token: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<DocumentationRecord>, String> {
+    require_session(&state, &session_token).map_err(map_err)?;
+    let items = with_conn(&state, |conn| {
+        let mut stmt = conn.prepare(
+            r#"
+SELECT d.id, d.event_name, d.event_date, d.registration_collected_cents,
+  COALESCE((SELECT SUM(e.amount_cents) FROM documentation_expenses e WHERE e.documentation_id=d.id), 0) AS expenses_cents,
+  d.notes, d.created_at
+FROM documentations d
+ORDER BY d.event_date DESC, d.id DESC
+LIMIT 500
+"#,
+        )?;
+        let rows = stmt.query_map([], |row| {
+            let collected: i64 = row.get(3)?;
+            let expenses: i64 = row.get(4)?;
+            Ok(DocumentationRecord {
+                id: row.get(0)?,
+                event_name: row.get(1)?,
+                event_date: row.get(2)?,
+                registration_collected_cents: collected,
+                expenses_cents: expenses,
+                balance_cents: collected - expenses,
+                notes: row.get(5)?,
+                created_at: row.get(6)?,
+            })
+        })?;
+        let mut out = vec![];
+        for r in rows {
+            out.push(r?);
+        }
+        Ok(out)
+    })
+    .map_err(map_err)?;
+    Ok(items)
+}
+
+#[tauri::command]
+pub fn documentation_detail(
+    session_token: String,
+    id: i64,
+    state: State<'_, AppState>,
+) -> Result<DocumentationDetail, String> {
+    require_session(&state, &session_token).map_err(map_err)?;
+    let detail = with_conn(&state, |conn| build_documentation_detail(conn, id)).map_err(map_err)?;
+    Ok(detail)
+}
+
+#[tauri::command]
+pub fn documentations_create(
+    session_token: String,
+    payload: DocumentationCreate,
+    state: State<'_, AppState>,
+) -> Result<IdResult, String> {
+    require_session(&state, &session_token).map_err(map_err)?;
+    validate_date(&payload.event_date)?;
+    if payload.event_name.trim().is_empty() {
+        return Err("invalid input: event name required".to_string());
+    }
+    if payload.registration_collected_cents <= 0 {
+        return Err("invalid input: registration collected must be > 0".to_string());
+    }
+    let id = with_conn(&state, |conn| {
+        conn.execute(
+            r#"
+INSERT INTO documentations (event_name, event_date, registration_fee_cents, registration_collected_cents, notes, created_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+"#,
+            params![
+                payload.event_name.trim(),
+                payload.event_date,
+                payload.registration_collected_cents,
+                payload.registration_collected_cents,
+                payload.notes,
+                db::now_iso()
+            ],
+        )?;
+        Ok(conn.last_insert_rowid())
+    })
+    .map_err(map_err)?;
+    Ok(IdResult { id })
+}
+
+#[tauri::command]
+pub fn documentation_expenses_create(
+    session_token: String,
+    payload: DocumentationExpenseCreate,
+    state: State<'_, AppState>,
+) -> Result<IdResult, String> {
+    require_session(&state, &session_token).map_err(map_err)?;
+    validate_date(&payload.spent_at)?;
+    if payload.amount_cents <= 0 {
+        return Err("invalid input: expense amount must be > 0".to_string());
+    }
+    let id = with_conn(&state, |conn| {
+        conn.execute(
+            r#"
+INSERT INTO documentation_expenses (documentation_id, spent_at, amount_cents, payee, notes, created_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+"#,
+            params![
+                payload.documentation_id,
+                payload.spent_at,
+                payload.amount_cents,
+                payload.payee,
+                payload.notes,
+                db::now_iso()
+            ],
+        )?;
+        Ok(conn.last_insert_rowid())
+    })
+    .map_err(map_err)?;
+    Ok(IdResult { id })
+}
+
+#[tauri::command]
+pub fn documentation_expenses_delete(
+    session_token: String,
+    id: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    require_session(&state, &session_token).map_err(map_err)?;
+    with_conn(&state, |conn| {
+        conn.execute("DELETE FROM documentation_expenses WHERE id=?1", params![id])?;
+        Ok(())
+    })
+    .map_err(map_err)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn documentations_delete(
+    session_token: String,
+    id: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    require_session(&state, &session_token).map_err(map_err)?;
+    with_conn(&state, |conn| {
+        conn.execute("DELETE FROM documentations WHERE id=?1", params![id])?;
+        Ok(())
+    })
+    .map_err(map_err)?;
+    Ok(())
+}
+
+fn build_documentation_detail(conn: &Connection, id: i64) -> AppResult<DocumentationDetail> {
+    let documentation = conn.query_row(
+        r#"
+SELECT d.id, d.event_name, d.event_date, d.registration_collected_cents,
+  COALESCE((SELECT SUM(e.amount_cents) FROM documentation_expenses e WHERE e.documentation_id=d.id), 0) AS expenses_cents,
+  d.notes, d.created_at
+FROM documentations d
+WHERE d.id=?1
+"#,
+        params![id],
+        |row| {
+            let collected: i64 = row.get(3)?;
+            let expenses: i64 = row.get(4)?;
+            Ok(DocumentationRecord {
+                id: row.get(0)?,
+                event_name: row.get(1)?,
+                event_date: row.get(2)?,
+                registration_collected_cents: collected,
+                expenses_cents: expenses,
+                balance_cents: collected - expenses,
+                notes: row.get(5)?,
+                created_at: row.get(6)?,
+            })
+        },
+    )?;
+
+    let mut stmt = conn.prepare(
+        r#"
+SELECT id, spent_at, amount_cents, payee, notes, created_at
+FROM documentation_expenses
+WHERE documentation_id=?1
+ORDER BY spent_at DESC, id DESC
+"#,
+    )?;
+    let rows = stmt.query_map(params![id], |row| {
+        Ok(DocumentationExpenseRow {
+            id: row.get(0)?,
+            spent_at: row.get(1)?,
+            amount_cents: row.get(2)?,
+            payee: row.get(3)?,
+            notes: row.get(4)?,
+            created_at: row.get(5)?,
+        })
+    })?;
+    let mut expenses = vec![];
+    for row in rows {
+        expenses.push(row?);
+    }
+
+    Ok(DocumentationDetail {
+        documentation,
+        expenses,
+    })
+}
+
+#[tauri::command]
 pub fn donations_list(
     session_token: String,
     filter: DateRangeFilter,
@@ -685,7 +889,17 @@ pub fn database_health(session_token: String, state: State<'_, AppState>) -> Res
         let integrity_ok = integrity_result.trim().eq_ignore_ascii_case("ok");
 
         let mut record_count = 0i64;
-        for table in ["meta", "admins", "donors", "projects", "categories", "donations", "expenses"] {
+        for table in [
+            "meta",
+            "admins",
+            "donors",
+            "projects",
+            "documentations",
+            "documentation_expenses",
+            "categories",
+            "donations",
+            "expenses",
+        ] {
             let sql = format!("SELECT COUNT(*) FROM {table}");
             let count: i64 = conn.query_row(&sql, [], |row| row.get(0))?;
             record_count += count;
