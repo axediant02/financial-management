@@ -25,6 +25,7 @@ const selectedProjectId = ref<number | null>(null);
 const tab = ref<DetailTab>("overview");
 const previousTab = ref<Exclude<DetailTab, "project_detail">>("overview");
 const sidebarCollapsed = ref(localStorage.getItem(SIDEBAR_KEY) === "true");
+const showCreateRecordChooser = ref(false);
 
 function isDetailTab(value: string): value is DetailTab {
   return (
@@ -113,7 +114,7 @@ function openProjects() {
 }
 
 function openCreateRecord() {
-  tab.value = "projects";
+  showCreateRecordChooser.value = true;
 }
 
 function openDocumentation() {
@@ -126,6 +127,20 @@ function openDonations() {
 
 function openExpenses() {
   tab.value = "expenses";
+}
+
+function closeCreateRecordChooser() {
+  showCreateRecordChooser.value = false;
+}
+
+function chooseCreateProject() {
+  showCreateRecordChooser.value = false;
+  tab.value = "projects";
+}
+
+function chooseCreateDocumentation() {
+  showCreateRecordChooser.value = false;
+  tab.value = "documentation";
 }
 
 function openProjectDetail(id: number) {
@@ -407,6 +422,49 @@ function toggleSidebar() {
           @back="backToPreviousTab"
         />
       </main>
+    </div>
+
+    <div v-if="showCreateRecordChooser" class="fixed inset-0 z-50">
+      <div class="absolute inset-0 bg-black/50" @click="closeCreateRecordChooser"></div>
+      <div class="absolute inset-0 flex items-center justify-center p-4">
+        <div class="w-full max-w-2xl rounded-[22px] border border-[#d7c49a] bg-[#fbf7eb] p-6 shadow-2xl">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <div class="ledger-heading text-3xl font-normal text-[#1f3558]">New Record</div>
+              <div class="mt-1 text-sm text-[#6a6b5d]">Choose whether to create a project or documentation record.</div>
+            </div>
+            <button
+              class="rounded-lg border border-[#d7c49a] bg-white px-3 py-2 text-sm font-semibold text-[#243858] transition hover:bg-[#f4ecd7]"
+              @click="closeCreateRecordChooser"
+            >
+              Close
+            </button>
+          </div>
+
+          <div class="mt-6 grid gap-3 md:grid-cols-2">
+            <button
+              type="button"
+              class="rounded-[18px] border border-[#d7c49a] bg-white p-5 text-left transition hover:bg-[#f4ecd7]"
+              @click="chooseCreateProject"
+            >
+              <div class="text-lg font-semibold text-[#1f3558]">Project</div>
+              <p class="mt-2 text-sm leading-6 text-[#6a6b5d]">
+                Create a fund drive with a target budget, status, and date range.
+              </p>
+            </button>
+            <button
+              type="button"
+              class="rounded-[18px] border border-[#d7c49a] bg-white p-5 text-left transition hover:bg-[#f4ecd7]"
+              @click="chooseCreateDocumentation"
+            >
+              <div class="text-lg font-semibold text-[#1f3558]">Documentation</div>
+              <p class="mt-2 text-sm leading-6 text-[#6a6b5d]">
+                Record post-event registration funds with the event name and collected amount.
+              </p>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
