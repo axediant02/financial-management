@@ -21,4 +21,3 @@ pub fn backups_dir(app: &AppHandle) -> AppResult<std::path::PathBuf> {
     std::fs::create_dir_all(&dir)?;
     Ok(dir)
 }
-

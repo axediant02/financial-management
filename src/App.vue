@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { Moon, Sun } from "lucide-vue-next";
-import { appStatus, bootstrapAdmin, login, logout } from "./lib/api";
+import { appStatus, logout } from "./lib/api";
 import { notify } from "./lib/feedback";
 import DownloadPage from "./components/DownloadPage.vue";
 import SetupAdmin from "./components/SetupAdmin.vue";
 import LoginPage from "./components/LoginPage.vue";
-import ForgotPasswordPage from "./components/ForgotPasswordPage.vue";
+import ForgotPasscodePage from "./components/ForgotPasscodePage.vue";
 import MainApp from "./components/MainApp.vue";
 
 const THEME_KEY = "pft_theme_mode";
@@ -50,14 +50,12 @@ async function refreshStatus() {
   appDataDir.value = status.app_data_dir;
 }
 
-async function handleBootstrap(password: string) {
+async function handleBootstrapSuccess(sessionTokenValue: string) {
   errorMessage.value = null;
-  await bootstrapAdmin(password);
-  const res = await login(password);
-  sessionToken.value = res.session_token;
-  localStorage.setItem("pft_session_token", res.session_token);
+  sessionToken.value = sessionTokenValue;
+  localStorage.setItem("pft_session_token", sessionTokenValue);
   await refreshStatus();
-  notify("Admin password created.");
+  notify("Admin passcode created.");
 }
 
 function handleLoginSuccess(token: string) {
@@ -66,7 +64,7 @@ function handleLoginSuccess(token: string) {
   notify("Logged in.");
 }
 
-function handleOpenForgotPassword() {
+function handleOpenForgotPasscode() {
   authScreen.value = "forgot";
 }
 
@@ -74,9 +72,9 @@ function handleBackToLogin() {
   authScreen.value = "login";
 }
 
-function handlePasswordReplaced() {
+function handleRecoveryComplete() {
   authScreen.value = "login";
-  notify("Password replaced. Sign in with the new password.");
+  notify("Passcode replaced. Sign in with the new passcode.");
 }
 
 async function handleLogout() {
@@ -180,19 +178,19 @@ onMounted(async () => {
         v-if="!hasAdmin"
         :db-path="dbPath"
         :app-data-dir="appDataDir"
-        @bootstrap="handleBootstrap"
+        @bootstrap-success="handleBootstrapSuccess"
       />
 
       <LoginPage
         v-else-if="!isAuthed && authScreen === 'login'"
         @login-success="handleLoginSuccess"
-        @forgot-password="handleOpenForgotPassword"
+        @forgot-passcode="handleOpenForgotPasscode"
       />
 
-      <ForgotPasswordPage
+      <ForgotPasscodePage
         v-else-if="!isAuthed && authScreen === 'forgot'"
         @back-to-login="handleBackToLogin"
-        @password-replaced="handlePasswordReplaced"
+        @passcode-replaced="handleRecoveryComplete"
       />
 
       <MainApp v-else :session-token="sessionToken!" :theme-mode="themeMode" @logout="handleLogout" />
