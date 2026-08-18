@@ -25,6 +25,11 @@ const currentPath = ref(window.location.pathname);
 
 const isAuthed = computed(() => !!sessionToken.value);
 const isDownloadRoute = computed(() => currentPath.value === "/download" || currentPath.value === "/download/");
+const isTauriRuntime = computed(
+  () =>
+    typeof window !== "undefined" &&
+    typeof (window as any).__TAURI_INTERNALS__?.invoke === "function",
+);
 
 function showToast(message: string) {
   toast.value = message;
@@ -105,7 +110,7 @@ onMounted(async () => {
     currentPath.value = window.location.pathname;
   });
   applyTheme();
-  if (isDownloadRoute.value) {
+  if (isDownloadRoute.value || !isTauriRuntime.value) {
     loading.value = false;
     return;
   }
@@ -136,7 +141,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <DownloadPage v-if="isDownloadRoute" />
+  <DownloadPage v-if="isDownloadRoute || !isTauriRuntime" />
 
   <div
     v-else
