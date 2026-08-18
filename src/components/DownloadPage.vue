@@ -1,166 +1,160 @@
 <script setup lang="ts">
-import { Download, ShieldCheck, HardDrive, Monitor, Package, ArrowRight } from "@lucide/vue";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import {
+  ArrowDownToLine,
+  Check,
+  HardDrive,
+  LockKeyhole,
+  Monitor,
+  Package,
+  ShieldCheck,
+} from "lucide-vue-next";
 
 const version = "0.1.0";
-const files = [
-  {
-    label: "MSI installer",
-    description: "Best for standard Windows deployment and managed installs.",
-    href: "/download/financial-system_0.1.0_x64_en-US.msi",
-    note: "Recommended for IT-managed installs.",
-  },
-  {
-    label: "Setup EXE",
-    description: "A double-click installer for direct desktop installation.",
-    href: "/download/financial-system_0.1.0_x64-setup.exe",
-    note: "Useful for quick local installs.",
-  },
-];
+const msiHref = "/download/financial-system_0.1.0_x64_en-US.msi";
+const exeHref = "/download/financial-system_0.1.0_x64-setup.exe";
 
-const highlights = [
-  "Windows 64-bit desktop app",
-  "Offline first operation",
-  "Local data storage on the machine",
-  `Version ${version}`,
+const features = [
+  {
+    number: "01",
+    title: "Everything in one place",
+    description: "Keep track of projects, donations, expenses, and balances in one simple app.",
+  },
+  {
+    number: "02",
+    title: "Works without internet",
+    description: "Open the app and keep working even when there is no internet connection.",
+  },
+  {
+    number: "03",
+    title: "Easy to understand",
+    description: "Keep clear records of collections, expenses, documents, and reports.",
+  },
 ];
 </script>
 
 <template>
-  <main class="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.76),transparent_34%),radial-gradient(circle_at_85%_10%,rgba(221,189,125,0.34),transparent_28%),linear-gradient(180deg,#f6f0e4_0%,#ead9b8_100%)] px-4 py-6 text-foreground md:px-6 md:py-8">
-    <div class="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-6xl items-center">
-      <section class="grid w-full gap-6">
-        <Card class="overflow-hidden border-border/80 bg-card/95 shadow-[0_24px_70px_rgba(32,50,79,0.14)] backdrop-blur">
-          <CardHeader class="gap-5 md:gap-6">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div class="max-w-3xl space-y-4">
-                <Badge variant="secondary" class="border border-border/60 bg-secondary/80 px-4 py-1.5 text-[11px] uppercase tracking-[0.18em] text-secondary-foreground">
-                  Offline desktop app
-                </Badge>
-                <div class="space-y-3">
-                  <CardTitle class="text-4xl leading-[0.95] tracking-[-0.06em] md:text-6xl">
-                    Download Financial System
-                  </CardTitle>
-                  <CardDescription class="max-w-2xl text-base md:text-lg">
-                    Install the Windows desktop app to manage church funds offline. Data stays on the device,
-                    so the team can keep working even without a constant internet connection.
-                  </CardDescription>
-                </div>
-              </div>
+  <main class="relative min-h-screen overflow-hidden bg-[#060d1b] px-4 py-5 text-[#edf2f7] sm:px-6 lg:px-10">
+    <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(48,76,116,0.42),transparent_32%),radial-gradient(circle_at_90%_22%,rgba(185,143,67,0.16),transparent_25%),linear-gradient(135deg,#060d1b_0%,#0b1628_54%,#091221_100%)]" />
+    <div class="pointer-events-none absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(218,190,123,0.07)_1px,transparent_1px),linear-gradient(90deg,rgba(218,190,123,0.07)_1px,transparent_1px)] [background-size:56px_56px] [mask-image:linear-gradient(180deg,black,transparent_88%)]" />
+    <div class="pointer-events-none absolute -right-44 top-24 size-[34rem] rounded-full border border-[#d9b866]/10 shadow-[0_0_0_32px_rgba(217,184,102,0.025),0_0_0_64px_rgba(217,184,102,0.02)]" />
 
-              <div class="grid gap-3 rounded-2xl border border-border bg-background/70 p-4 text-sm text-muted-foreground md:min-w-72">
-                <div class="flex items-center gap-3 text-foreground">
-                  <Monitor class="size-5 text-primary" />
-                  <span class="font-semibold">Desktop release</span>
+    <div class="relative mx-auto w-full max-w-7xl">
+      <header class="flex items-center justify-between border-b border-white/10 pb-5">
+        <a href="/" class="group inline-flex items-center gap-3" aria-label="Church Ledger home">
+          <span class="flex size-9 items-center justify-center rounded-xl border border-[#d9b866]/50 bg-[#d9b866]/10 text-[#f0ce86] transition group-hover:bg-[#d9b866]/20">
+            <LockKeyhole class="size-4" />
+          </span>
+          <span>
+            <span class="block text-[11px] font-semibold uppercase tracking-[0.32em] text-[#f0ce86]">Church Ledger</span>
+            <span class="mt-0.5 block text-[10px] uppercase tracking-[0.2em] text-[#8b9ab0]">Money records made simple</span>
+          </span>
+        </a>
+        <div class="hidden items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#8b9ab0] sm:flex">
+          <span class="size-1.5 rounded-full bg-[#73b587] shadow-[0_0_12px_rgba(115,181,135,0.85)]" />
+          Version {{ version }}
+        </div>
+      </header>
+
+      <section class="grid gap-12 pb-20 pt-16 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end lg:gap-20 lg:pb-24 lg:pt-24">
+        <div class="max-w-3xl">
+          <div class="mb-7 inline-flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.3em] text-[#d9b866]">
+            <span class="h-px w-8 bg-[#d9b866]" />
+            For Windows computers
+          </div>
+          <h1 class="max-w-3xl font-serif text-5xl leading-[0.98] tracking-[-0.055em] text-[#f5f2eb] sm:text-7xl lg:text-[6.6rem]">
+            Your money records,
+            <span class="block text-[#d9b866]">kept close.</span>
+          </h1>
+          <p class="mt-8 max-w-xl text-base leading-8 text-[#aab6c6] sm:text-lg">
+            A simple app for keeping track of church funds. It works without the internet and keeps your information on your computer.
+          </p>
+          <div class="mt-10 flex flex-col gap-3 sm:flex-row">
+            <a
+              :href="msiHref"
+              class="group inline-flex h-14 items-center justify-center gap-3 rounded-xl bg-[#d9b866] px-6 text-sm font-bold text-[#091221] shadow-[0_14px_32px_rgba(217,184,102,0.2)] transition hover:-translate-y-0.5 hover:bg-[#edd08d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f5d994] focus-visible:ring-offset-2 focus-visible:ring-offset-[#060d1b]"
+            >
+              <ArrowDownToLine class="size-4 transition-transform group-hover:translate-y-0.5" />
+              Download the app
+            </a>
+            <a
+              :href="exeHref"
+              class="inline-flex h-14 items-center justify-center gap-3 rounded-xl border border-white/15 bg-white/[0.04] px-6 text-sm font-semibold text-[#e4eaf1] transition hover:border-[#d9b866]/50 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d9b866] focus-visible:ring-offset-2 focus-visible:ring-offset-[#060d1b]"
+            >
+              Other download option
+            </a>
+          </div>
+          <div class="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#718197]">
+            <span class="inline-flex items-center gap-2"><Check class="size-3 text-[#73b587]" /> For Windows 10 and 11</span>
+            <span class="inline-flex items-center gap-2"><Check class="size-3 text-[#73b587]" /> Version {{ version }}</span>
+            <span class="inline-flex items-center gap-2"><Check class="size-3 text-[#73b587]" /> Works without internet</span>
+          </div>
+        </div>
+
+        <aside class="relative overflow-hidden rounded-2xl border border-white/12 bg-[#0e1a2c]/85 p-6 shadow-[0_28px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+          <div class="absolute right-0 top-0 size-40 rounded-full bg-[#d9b866]/10 blur-3xl" />
+          <div class="relative">
+            <div class="flex items-center justify-between border-b border-white/10 pb-5">
+              <span class="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#8b9ab0]">This download</span>
+              <span class="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#73b587]"><span class="size-1.5 rounded-full bg-[#73b587]" /> Available now</span>
+            </div>
+            <div class="border-b border-white/10 py-7">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="text-3xl font-semibold tracking-[-0.04em] text-[#f5f2eb]">Version {{ version }}</p>
+                  <p class="mt-2 text-sm text-[#8b9ab0]">Ready to install</p>
                 </div>
-                <Separator />
-                <div class="flex items-center gap-3">
-                  <ShieldCheck class="size-4 text-primary" />
-                  <span>Built for offline-first use</span>
-                </div>
-                <div class="flex items-center gap-3">
-                  <HardDrive class="size-4 text-primary" />
-                  <span>Stores records locally</span>
-                </div>
-                <div class="flex items-center gap-3">
-                  <Package class="size-4 text-primary" />
-                  <span>Release version {{ version }}</span>
-                </div>
+                <span class="flex size-11 items-center justify-center rounded-full border border-[#d9b866]/30 bg-[#d9b866]/10 text-[#f0ce86]"><Package class="size-5" /></span>
               </div>
             </div>
-          </CardHeader>
-
-          <CardContent>
-            <div class="grid gap-6 lg:grid-cols-12">
-              <div class="lg:col-span-7">
-                <div class="grid gap-4 sm:grid-cols-2">
-                  <Button
-                    href="/download/financial-system_0.1.0_x64_en-US.msi"
-                    class="h-auto justify-start rounded-2xl px-5 py-4 text-left shadow-sm"
-                  >
-                    <span class="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary-foreground/15">
-                      <Download class="size-5" />
-                    </span>
-                    <span class="flex flex-col items-start">
-                      <span class="text-sm font-semibold">Download MSI Installer</span>
-                      <span class="text-xs font-normal text-primary-foreground/80">Recommended for managed deployment</span>
-                    </span>
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    href="/download/financial-system_0.1.0_x64-setup.exe"
-                    class="h-auto justify-start rounded-2xl border-border bg-background px-5 py-4 text-left"
-                  >
-                    <span class="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
-                      <ArrowRight class="size-5" />
-                    </span>
-                    <span class="flex flex-col items-start">
-                      <span class="text-sm font-semibold">Download Setup EXE</span>
-                      <span class="text-xs font-normal text-muted-foreground">Fast local install for Windows</span>
-                    </span>
-                  </Button>
-                </div>
-
-                <div class="mt-4 flex flex-wrap gap-2">
-                  <Badge v-for="item in highlights" :key="item" variant="outline" class="border-border/70 bg-background/80 px-3 py-1.5 text-xs text-foreground">
-                    {{ item }}
-                  </Badge>
-                </div>
-              </div>
-
-              <div class="lg:col-span-5">
-                <Card class="h-full border-border/70 bg-background/70">
-                  <CardHeader class="pb-4">
-                    <CardTitle class="text-2xl">Download options</CardTitle>
-                    <CardDescription>
-                      Choose the installer that matches how you deploy Windows apps.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent class="grid gap-4">
-                    <div
-                      v-for="file in files"
-                      :key="file.href"
-                      class="rounded-2xl border border-border bg-card/90 p-4"
-                    >
-                      <div class="flex items-start justify-between gap-4">
-                        <div>
-                          <h4 class="text-base font-semibold text-card-foreground">
-                            {{ file.label }}
-                          </h4>
-                          <p class="mt-2 text-sm leading-6 text-muted-foreground">
-                            {{ file.description }}
-                          </p>
-                        </div>
-                        <Badge variant="secondary" class="shrink-0">
-                          v{{ version }}
-                        </Badge>
-                      </div>
-                      <div class="mt-4 flex flex-wrap items-center gap-3">
-                        <Button :href="file.href" size="sm" class="rounded-xl">
-                          {{ file.label }}
-                        </Button>
-                        <span class="text-xs text-muted-foreground">{{ file.note }}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+            <dl class="grid gap-5 py-6 text-sm">
+              <div class="flex items-center justify-between gap-4"><dt class="text-[#8b9ab0]">Works on</dt><dd class="font-medium text-[#e4eaf1]">Windows 10 or 11</dd></div>
+              <div class="flex items-center justify-between gap-4"><dt class="text-[#8b9ab0]">Internet needed</dt><dd class="font-medium text-[#e4eaf1]">No</dd></div>
+              <div class="flex items-center justify-between gap-4"><dt class="text-[#8b9ab0]">Your information</dt><dd class="font-medium text-[#73b587]">Stays on your computer</dd></div>
+            </dl>
+            <div class="flex items-center gap-3 border-t border-white/10 pt-5 text-xs leading-5 text-[#8b9ab0]">
+              <ShieldCheck class="size-5 shrink-0 text-[#d9b866]" />
+              Your information stays on this computer.
             </div>
-          </CardContent>
-
-          <CardFooter class="flex-col items-start gap-4 pt-0">
-            <Separator />
-            <p class="max-w-4xl text-sm leading-6 text-muted-foreground">
-              If you publish these installers on the public internet, replace the local `/download/...`
-              links with the actual release asset URLs. The page is already wired for direct downloads.
-            </p>
-          </CardFooter>
-        </Card>
+          </div>
+        </aside>
       </section>
+
+      <section class="border-y border-white/10 py-8 lg:py-9">
+        <div class="grid gap-8 md:grid-cols-3 md:gap-6">
+          <article v-for="feature in features" :key="feature.number" class="relative md:border-l md:border-white/10 md:pl-6 first:md:border-l-0 first:md:pl-0">
+            <p class="text-[10px] font-bold tracking-[0.24em] text-[#d9b866]">{{ feature.number }}</p>
+            <h2 class="mt-3 text-base font-semibold tracking-[-0.015em] text-[#eef2f6]">{{ feature.title }}</h2>
+            <p class="mt-2 max-w-sm text-sm leading-6 text-[#8795a9]">{{ feature.description }}</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="grid gap-6 py-16 lg:grid-cols-[1fr_1.3fr] lg:items-center lg:py-20">
+        <div>
+          <div class="mb-5 inline-flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.3em] text-[#d9b866]"><span class="h-px w-7 bg-[#d9b866]" /> Choose how to install</div>
+          <h2 class="max-w-md font-serif text-4xl leading-tight tracking-[-0.04em] text-[#f5f2eb]">Start keeping better records.</h2>
+          <p class="mt-5 max-w-md text-sm leading-7 text-[#8795a9]">Choose the recommended download for the easiest setup. Both options install the same Church Ledger app.</p>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <a :href="msiHref" class="group rounded-2xl border border-[#d9b866]/45 bg-[#d9b866]/[0.08] p-5 transition hover:-translate-y-1 hover:border-[#d9b866] hover:bg-[#d9b866]/[0.13] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d9b866]">
+            <div class="flex items-center justify-between"><span class="flex size-10 items-center justify-center rounded-xl bg-[#d9b866] text-[#091221]"><Monitor class="size-5" /></span><span class="text-[10px] font-bold uppercase tracking-[0.2em] text-[#d9b866]">Best choice</span></div>
+            <h3 class="mt-7 text-lg font-semibold text-[#f5f2eb]">Recommended download</h3>
+            <p class="mt-2 text-sm leading-6 text-[#98a7b9]">The easiest option for most people using a Windows computer.</p>
+            <span class="mt-6 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-[#d9b866]">Download now <ArrowDownToLine class="size-3 transition-transform group-hover:translate-y-0.5" /></span>
+          </a>
+          <a :href="exeHref" class="group rounded-2xl border border-white/12 bg-white/[0.035] p-5 transition hover:-translate-y-1 hover:border-white/25 hover:bg-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d9b866]">
+            <div class="flex items-center justify-between"><span class="flex size-10 items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] text-[#d9b866]"><HardDrive class="size-5" /></span><span class="text-[10px] font-bold uppercase tracking-[0.2em] text-[#718197]">Other option</span></div>
+            <h3 class="mt-7 text-lg font-semibold text-[#f5f2eb]">Other download</h3>
+            <p class="mt-2 text-sm leading-6 text-[#98a7b9]">Try this option if the recommended download does not work.</p>
+            <span class="mt-6 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-[#b9c4d1]">Try this download <ArrowDownToLine class="size-3 transition-transform group-hover:translate-y-0.5" /></span>
+          </a>
+        </div>
+      </section>
+
+      <footer class="flex flex-col gap-4 border-t border-white/10 py-7 text-xs leading-6 text-[#718197] sm:flex-row sm:items-center sm:justify-between">
+        <p>Church Ledger <span class="px-2 text-[#d9b866]">/</span> Version {{ version }}</p>
+        <p class="inline-flex items-center gap-2"><LockKeyhole class="size-3 text-[#d9b866]" /> Your information stays on your computer</p>
+      </footer>
     </div>
   </main>
 </template>

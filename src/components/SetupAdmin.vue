@@ -50,8 +50,8 @@ async function submit() {
 <template>
   <main class="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.76),transparent_34%),radial-gradient(circle_at_85%_10%,rgba(221,189,125,0.34),transparent_28%),linear-gradient(180deg,#f6f0e4_0%,#ead9b8_100%)] px-4 py-6 text-foreground md:px-6 md:py-8">
     <div class="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-6xl items-center">
-      <section class="grid w-full gap-6 lg:grid-cols-12">
-        <Card class="overflow-hidden border-border/80 bg-card/95 shadow-[0_24px_70px_rgba(32,50,79,0.14)] backdrop-blur lg:col-span-7">
+      <section class="grid w-full justify-items-center gap-6">
+        <Card class="w-full max-w-3xl overflow-hidden border-border/80 bg-card/95 shadow-[0_24px_70px_rgba(32,50,79,0.14)] backdrop-blur">
           <CardHeader class="gap-4 md:gap-5">
             <div class="inline-flex w-fit items-center gap-2 rounded-full border border-border/60 bg-secondary/80 px-4 py-1.5 text-[11px] uppercase tracking-[0.18em] text-secondary-foreground">
               <ShieldCheck class="size-4 text-primary" />
@@ -131,8 +131,6 @@ async function submit() {
             </form>
           </CardContent>
         </Card>
-
-        <div class="lg:col-span-5"></div>
       </section>
     </div>
   </main>
