@@ -82,6 +82,51 @@ pub struct ProjectUpdate {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct DocumentationRecord {
+    pub id: i64,
+    pub event_name: String,
+    pub event_date: String,
+    pub registration_collected_cents: i64,
+    pub expenses_cents: i64,
+    pub balance_cents: i64,
+    pub notes: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DocumentationCreate {
+    pub event_name: String,
+    pub event_date: String,
+    pub registration_collected_cents: i64,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DocumentationExpenseRow {
+    pub id: i64,
+    pub spent_at: String,
+    pub amount_cents: i64,
+    pub payee: Option<String>,
+    pub notes: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DocumentationExpenseCreate {
+    pub documentation_id: i64,
+    pub spent_at: String,
+    pub amount_cents: i64,
+    pub payee: Option<String>,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DocumentationDetail {
+    pub documentation: DocumentationRecord,
+    pub expenses: Vec<DocumentationExpenseRow>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct Donation {
     pub id: i64,
     pub donated_at: String,

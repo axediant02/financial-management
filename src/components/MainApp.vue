@@ -6,6 +6,7 @@ import OverviewDashboard from "./views/OverviewDashboard.vue";
 import DonationsView from "./views/DonationsView.vue";
 import ExpensesView from "./views/ExpensesView.vue";
 import ProjectsView from "./views/ProjectsView.vue";
+import DocumentationView from "./views/DocumentationView.vue";
 import ReportsView from "./views/ReportsView.vue";
 import BackupsView from "./views/BackupsView.vue";
 import ProjectDetailView from "./views/ProjectDetailView.vue";
@@ -13,7 +14,7 @@ import ProjectDetailView from "./views/ProjectDetailView.vue";
 const props = defineProps<{ sessionToken: string; themeMode: "light" | "dark" }>();
 const emit = defineEmits<{ (e: "logout"): void }>();
 
-type Tab = "overview" | "donations" | "expenses" | "projects" | "reports" | "backups";
+type Tab = "overview" | "donations" | "expenses" | "projects" | "documentation" | "reports" | "backups";
 type DetailTab = Tab | "project_detail";
 
 const NAV_TAB_KEY = "pft_nav_tab";
@@ -24,6 +25,7 @@ const selectedProjectId = ref<number | null>(null);
 const tab = ref<DetailTab>("overview");
 const previousTab = ref<Exclude<DetailTab, "project_detail">>("overview");
 const sidebarCollapsed = ref(localStorage.getItem(SIDEBAR_KEY) === "true");
+const showCreateRecordChooser = ref(false);
 
 function isDetailTab(value: string): value is DetailTab {
   return (
@@ -31,6 +33,7 @@ function isDetailTab(value: string): value is DetailTab {
     value === "donations" ||
     value === "expenses" ||
     value === "projects" ||
+    value === "documentation" ||
     value === "reports" ||
     value === "backups" ||
     value === "project_detail"
@@ -43,6 +46,7 @@ function isTab(value: string): value is Tab {
     value === "donations" ||
     value === "expenses" ||
     value === "projects" ||
+    value === "documentation" ||
     value === "reports" ||
     value === "backups"
   );
@@ -109,12 +113,34 @@ function openProjects() {
   tab.value = "projects";
 }
 
+function openCreateRecord() {
+  showCreateRecordChooser.value = true;
+}
+
+function openDocumentation() {
+  tab.value = "documentation";
+}
+
 function openDonations() {
   tab.value = "donations";
 }
 
 function openExpenses() {
   tab.value = "expenses";
+}
+
+function closeCreateRecordChooser() {
+  showCreateRecordChooser.value = false;
+}
+
+function chooseCreateProject() {
+  showCreateRecordChooser.value = false;
+  tab.value = "projects";
+}
+
+function chooseCreateDocumentation() {
+  showCreateRecordChooser.value = false;
+  tab.value = "documentation";
 }
 
 function openProjectDetail(id: number) {
@@ -140,6 +166,8 @@ function detailBackLabel() {
       return "Expenses";
     case "projects":
       return "Projects";
+    case "documentation":
+      return "Documentation";
     case "reports":
       return "Reports";
     case "backups":
@@ -219,6 +247,25 @@ function toggleSidebar() {
               </svg>
             </span>
             <span v-if="!sidebarCollapsed">Projects</span>
+          </button>
+          <button
+            class="flex w-full items-center rounded-[10px] px-4 py-3 text-left text-sm font-semibold transition"
+            :class="[
+              tab === 'documentation' ? 'bg-[#31476a] text-white shadow-inner' : 'text-[#d8e0ec] hover:bg-white/5',
+              sidebarCollapsed ? 'justify-center gap-0' : 'gap-3',
+            ]"
+            @click="openDocumentation"
+            :title="sidebarCollapsed ? 'Documentation' : undefined"
+          >
+            <span class="flex h-5 w-5 items-center justify-center">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M6 4h9l3 3v13H6z" />
+                <path d="M15 4v4h4" />
+                <path d="M8 12h8" />
+                <path d="M8 16h8" />
+              </svg>
+            </span>
+            <span v-if="!sidebarCollapsed">Documentation</span>
           </button>
           <button
             class="flex w-full items-center rounded-[10px] px-4 py-3 text-left text-sm font-semibold transition"
@@ -340,13 +387,18 @@ function toggleSidebar() {
           @create-project="tab = 'projects'"
           @open-project="openProjectDetail"
           @open-projects="openProjects"
-          @open-donations="openDonations"
+          @open-create-record="openCreateRecord"
           @open-expenses="openExpenses"
         />
-        <ProjectsView
+          <ProjectsView
           v-else-if="tab === 'projects'"
           :session-token="sessionToken"
           @open-project="openProjectDetail"
+          @open-documentation="openDocumentation"
+        />
+        <DocumentationView
+          v-else-if="tab === 'documentation'"
+          :session-token="sessionToken"
         />
         <ExpensesView v-else-if="tab === 'expenses'" :session-token="sessionToken" />
         <DonationsView v-else-if="tab === 'donations'" :session-token="sessionToken" />
@@ -361,6 +413,49 @@ function toggleSidebar() {
           @back="backToPreviousTab"
         />
       </main>
+    </div>
+
+    <div v-if="showCreateRecordChooser" class="fixed inset-0 z-50">
+      <div class="absolute inset-0 bg-black/50" @click="closeCreateRecordChooser"></div>
+      <div class="absolute inset-0 flex items-center justify-center p-4">
+        <div class="w-full max-w-2xl rounded-[22px] border border-[#d7c49a] bg-[#fbf7eb] p-6 shadow-2xl">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <div class="ledger-heading text-3xl font-normal text-[#1f3558]">New Record</div>
+              <div class="mt-1 text-sm text-[#6a6b5d]">Choose whether to create a project or documentation record.</div>
+            </div>
+            <button
+              class="rounded-lg border border-[#d7c49a] bg-white px-3 py-2 text-sm font-semibold text-[#243858] transition hover:bg-[#f4ecd7]"
+              @click="closeCreateRecordChooser"
+            >
+              Close
+            </button>
+          </div>
+
+          <div class="mt-6 grid gap-3 md:grid-cols-2">
+            <button
+              type="button"
+              class="rounded-[18px] border border-[#d7c49a] bg-white p-5 text-left transition hover:bg-[#f4ecd7]"
+              @click="chooseCreateProject"
+            >
+              <div class="text-lg font-semibold text-[#1f3558]">Project</div>
+              <p class="mt-2 text-sm leading-6 text-[#6a6b5d]">
+                Create a fund drive with a target budget, status, and date range.
+              </p>
+            </button>
+            <button
+              type="button"
+              class="rounded-[18px] border border-[#d7c49a] bg-white p-5 text-left transition hover:bg-[#f4ecd7]"
+              @click="chooseCreateDocumentation"
+            >
+              <div class="text-lg font-semibold text-[#1f3558]">Documentation</div>
+              <p class="mt-2 text-sm leading-6 text-[#6a6b5d]">
+                Record post-event registration funds with the event name and collected amount.
+              </p>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>

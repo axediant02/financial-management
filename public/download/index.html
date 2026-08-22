@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Download Church Ledger for Windows. Track church donations, expenses, projects, and balances in a simple app that works without internet." />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#060d1b" />
+    <meta name="application-name" content="Church Ledger" />
+    <link rel="icon" type="image/png" href="/church-ledger-icon.png" />
+    <link rel="canonical" href="/download" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Church Ledger" />
+    <meta property="og:title" content="Download Church Ledger for Windows" />
+    <meta property="og:description" content="Track church donations, expenses, projects, and balances in a simple Windows app that works without internet." />
+    <meta property="og:image" content="/church-ledger-icon.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Download Church Ledger for Windows" />
+    <meta name="twitter:description" content="A simple app for tracking church funds, donations, expenses, projects, and balances." />
+    <title>Download Church Ledger for Windows</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Church Ledger",
+        "description": "A simple Windows app for tracking church donations, expenses, projects, and balances without internet.",
+        "operatingSystem": "Windows 10, Windows 11",
+        "applicationCategory": "BusinessApplication",
+        "softwareVersion": "0.1.0"
+      }
+    </script>
+    <style>
+      :root { color-scheme: dark; --ink: #f5f2eb; --muted: #8795a9; --soft: #aab6c6; --line: rgba(255,255,255,.11); --gold: #d9b866; --gold-light: #f0ce86; --green: #73b587; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; }
+      body {
+        overflow-x: hidden;
+        color: var(--ink);
+        background: radial-gradient(circle at 16% 0%, rgba(48,76,116,.42), transparent 32%), radial-gradient(circle at 90% 22%, rgba(185,143,67,.16), transparent 25%), linear-gradient(135deg, #060d1b 0%, #0b1628 54%, #091221 100%);
+        font-family: "Segoe UI", Inter, system-ui, sans-serif;
+      }
+      body::before { position: fixed; inset: 0; pointer-events: none; content: ""; opacity: .3; background-image: linear-gradient(rgba(218,190,123,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(218,190,123,.07) 1px, transparent 1px); background-size: 56px 56px; mask-image: linear-gradient(180deg, #000, transparent 88%); }
+      .page { position: relative; width: min(1240px, 100%); margin: 0 auto; padding: 20px 40px 0; }
+      .topbar, .footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); }
+      .topbar { padding-bottom: 20px; }
+      .brand { display: inline-flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; }
+      .brand-mark { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid rgba(217,184,102,.5); border-radius: 12px; color: var(--gold-light); background: rgba(217,184,102,.1); }
+      .brand-name, .brand-sub, .top-status, .eyebrow, .status, .meta, .section-kicker, .tag, .footer { text-transform: uppercase; }
+      .brand-name { display: block; color: var(--gold-light); font-size: 11px; font-weight: 700; letter-spacing: .32em; }
+      .brand-sub { display: block; margin-top: 2px; color: #8b9ab0; font-size: 10px; letter-spacing: .2em; }
+      .top-status { display: flex; align-items: center; gap: 12px; color: #8b9ab0; font-size: 10px; font-weight: 700; letter-spacing: .26em; }
+      .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 12px rgba(115,181,135,.85); }
+      .hero { display: grid; grid-template-columns: minmax(0, 1fr) 360px; align-items: end; gap: 80px; padding: 96px 0 92px; }
+      .eyebrow, .section-kicker { display: inline-flex; align-items: center; gap: 12px; color: var(--gold); font-size: 11px; font-weight: 700; letter-spacing: .3em; }
+      .eyebrow::before, .section-kicker::before { width: 32px; height: 1px; content: ""; background: var(--gold); }
+      h1, h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; }
+      h1 { max-width: 760px; margin: 28px 0 0; color: var(--ink); font-size: clamp(3.2rem, 8vw, 6.6rem); line-height: .98; letter-spacing: -.055em; }
+      h1 span { display: block; color: var(--gold); }
+      .lead { max-width: 560px; margin: 32px 0 0; color: var(--soft); font-size: 18px; line-height: 2; }
+      .actions, .installers { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+      .actions { display: flex; flex-wrap: wrap; margin-top: 40px; }
+      .button { display: inline-flex; align-items: center; justify-content: center; min-height: 56px; padding: 0 24px; border-radius: 12px; color: #091221; background: var(--gold); box-shadow: 0 14px 32px rgba(217,184,102,.2); font-size: 14px; font-weight: 700; text-decoration: none; transition: 160ms ease; }
+      .button:hover, .installer:hover { transform: translateY(-2px); }
+      .button.secondary { color: #e4eaf1; border: 1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.04); box-shadow: none; }
+      .button:hover { background: #edd08d; }
+      .button.secondary:hover { border-color: rgba(217,184,102,.5); background: rgba(255,255,255,.08); }
+      .meta { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 24px; color: #718197; font-size: 11px; font-weight: 700; letter-spacing: .17em; }
+      .meta span::before { display: inline-block; width: 4px; height: 4px; margin: 0 8px 2px 0; border-radius: 50%; content: ""; background: var(--green); }
+      .console { position: relative; overflow: hidden; padding: 24px; border: 1px solid rgba(255,255,255,.12); border-radius: 16px; background: rgba(14,26,44,.85); box-shadow: 0 28px 80px rgba(0,0,0,.32); backdrop-filter: blur(18px); }
+      .console::after { position: absolute; right: -30px; top: -30px; width: 160px; height: 160px; border-radius: 50%; content: ""; background: rgba(217,184,102,.1); filter: blur(36px); }
+      .console-head, .console-title, .row, .security, .feature, .installer-head, .footer { position: relative; z-index: 1; }
+      .console-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 20px; border-bottom: 1px solid var(--line); color: #8b9ab0; font-size: 10px; font-weight: 700; letter-spacing: .28em; }
+      .status { display: inline-flex; align-items: center; gap: 8px; color: var(--green); font-size: 10px; letter-spacing: .2em; }
+      .console-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 28px 0; border-bottom: 1px solid var(--line); }
+      .version { margin: 0; color: var(--ink); font-size: 30px; font-weight: 700; letter-spacing: -.04em; }
+      .version-sub { margin: 8px 0 0; color: #8b9ab0; font-size: 14px; }
+      .package-icon, .installer-icon { display: grid; place-items: center; }
+      .package-icon { width: 44px; height: 44px; border: 1px solid rgba(217,184,102,.3); border-radius: 50%; color: var(--gold-light); background: rgba(217,184,102,.1); }
+      .rows { display: grid; gap: 20px; padding: 24px 0; }
+      .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: #8b9ab0; font-size: 14px; }
+      .row strong { color: #e4eaf1; font-weight: 600; }
+      .row strong.green { color: var(--green); }
+      .security { display: flex; gap: 12px; padding-top: 20px; border-top: 1px solid var(--line); color: #8b9ab0; font-size: 12px; line-height: 1.7; }
+      .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; padding: 32px 0 36px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+      .feature { padding-left: 24px; border-left: 1px solid var(--line); }
+      .feature:first-child { padding-left: 0; border-left: 0; }
+      .feature-number, .tag { color: var(--gold); font-size: 10px; font-weight: 700; letter-spacing: .24em; }
+      .feature h2 { margin: 12px 0 0; color: #eef2f6; font-family: inherit; font-size: 16px; font-weight: 700; }
+      .feature p, .section-copy, .installer p { color: var(--muted); font-size: 14px; line-height: 1.7; }
+      .feature p { max-width: 290px; margin: 8px 0 0; }
+      .download-section { display: grid; grid-template-columns: 1fr 1.3fr; align-items: center; gap: 48px; padding: 80px 0; }
+      .section-kicker { font-size: 10px; }
+      .download-section h2 { max-width: 430px; margin: 20px 0 0; color: var(--ink); font-size: 42px; line-height: 1.1; letter-spacing: -.04em; }
+      .section-copy { max-width: 430px; margin: 20px 0 0; line-height: 2; }
+      .installer { display: block; padding: 20px; border: 1px solid rgba(255,255,255,.12); border-radius: 16px; color: inherit; background: rgba(255,255,255,.035); text-decoration: none; transition: 160ms ease; }
+      .installer:hover { border-color: rgba(255,255,255,.25); background: rgba(255,255,255,.07); }
+      .installer.recommended { border-color: rgba(217,184,102,.45); background: rgba(217,184,102,.08); }
+      .installer.recommended:hover { border-color: var(--gold); background: rgba(217,184,102,.13); }
+      .installer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .installer-icon { width: 40px; height: 40px; border-radius: 11px; color: #091221; background: var(--gold); }
+      .installer:not(.recommended) .installer-icon { border: 1px solid rgba(255,255,255,.15); color: var(--gold); background: rgba(255,255,255,.06); }
+      .tag { color: #718197; font-size: 10px; letter-spacing: .2em; }
+      .recommended .tag, .recommended .installer-action { color: var(--gold); }
+      .installer h3 { margin: 28px 0 0; color: var(--ink); font-size: 18px; }
+      .installer p { min-height: 48px; margin: 8px 0 0; }
+      .installer-action { display: inline-flex; gap: 8px; margin-top: 24px; color: #b9c4d1; font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+      .footer { border-top: 1px solid var(--line); border-bottom: 0; padding: 28px 0; color: #718197; font-size: 12px; letter-spacing: .04em; }
+      .footer span { color: var(--gold); padding: 0 8px; }
+      @media (max-width: 900px) {
+        .page { padding-right: 24px; padding-left: 24px; }
+        .hero, .download-section { grid-template-columns: 1fr; gap: 48px; }
+        .hero { padding: 72px 0; }
+        .console { max-width: 520px; }
+      }
+      @media (max-width: 640px) {
+        .page { padding-right: 16px; padding-left: 16px; }
+        .top-status { display: none; }
+        .hero { gap: 40px; padding: 56px 0 64px; }
+        .lead { font-size: 16px; line-height: 1.8; }
+        .actions, .installers, .features { grid-template-columns: 1fr; display: grid; }
+        .button { width: 100%; }
+        .meta { gap: 12px 18px; line-height: 1.5; }
+        .features { gap: 28px; }
+        .feature, .feature:first-child { padding: 0 0 0 20px; border-left: 1px solid var(--line); }
+        .download-section { gap: 36px; padding: 64px 0; }
+        .download-section h2 { font-size: 36px; }
+        .installer p { min-height: 0; }
+        .footer { align-items: flex-start; flex-direction: column; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Church Ledger home">
+          <span class="brand-mark" aria-hidden="true">&#128274;</span>
+          <span><span class="brand-name">Church Ledger</span><span class="brand-sub">Money records made simple</span></span>
+        </a>
+        <div class="top-status"><span class="dot"></span> Version 0.1.0</div>
+      </header>
+      <section class="hero">
+        <div>
+          <div class="eyebrow">For Windows computers</div>
+          <h1>Your money records,<span>kept close.</span></h1>
+          <p class="lead">A simple app for keeping track of church funds. It works without the internet and keeps your information on your computer.</p>
+          <div class="actions">
+            <a class="button" href="/download/financial-system_0.1.0_x64_en-US.msi">&#8595; Download the app</a>
+            <a class="button secondary" href="/download/financial-system_0.1.0_x64-setup.exe">Other download option</a>
+          </div>
+          <div class="meta"><span>For Windows 10 and 11</span><span>Version 0.1.0</span><span>Works without internet</span></div>
+        </div>
+        <aside class="console">
+          <div class="console-head"><span>This download</span><span class="status"><span class="dot"></span> Available now</span></div>
+          <div class="console-title"><div><p class="version">Version 0.1.0</p><p class="version-sub">Ready to install</p></div><span class="package-icon" aria-hidden="true">&#9632;</span></div>
+          <div class="rows"><div class="row"><span>Works on</span><strong>Windows 10 or 11</strong></div><div class="row"><span>Internet needed</span><strong>No</strong></div><div class="row"><span>Your information</span><strong class="green">Stays on your computer</strong></div></div>
+          <div class="security"><span aria-hidden="true">&#10003;</span><span>Your information stays on this computer.</span></div>
+        </aside>
+      </section>
+      <section class="features">
+        <article class="feature"><div class="feature-number">01</div><h2>Everything in one place</h2><p>Keep track of projects, donations, expenses, and balances in one simple app.</p></article>
+        <article class="feature"><div class="feature-number">02</div><h2>Works without internet</h2><p>Open the app and keep working even when there is no internet connection.</p></article>
+        <article class="feature"><div class="feature-number">03</div><h2>Easy to understand</h2><p>Keep clear records of collections, expenses, documents, and reports.</p></article>
+      </section>
+      <section class="download-section">
+        <div><div class="section-kicker">Choose how to install</div><h2>Start keeping better records.</h2><p class="section-copy">Choose the recommended download for the easiest setup. Both options install the same Church Ledger app.</p></div>
+        <div class="installers">
+          <a class="installer recommended" href="/download/financial-system_0.1.0_x64_en-US.msi"><div class="installer-head"><span class="installer-icon" aria-hidden="true">&#8595;</span><span class="tag">Best choice</span></div><h3>Recommended download</h3><p>The easiest option for most people using a Windows computer.</p><span class="installer-action">Download now &#8595;</span></a>
+          <a class="installer" href="/download/financial-system_0.1.0_x64-setup.exe"><div class="installer-head"><span class="installer-icon" aria-hidden="true">&#9632;</span><span class="tag">Other option</span></div><h3>Other download</h3><p>Try this option if the recommended download does not work.</p><span class="installer-action">Try this download &#8595;</span></a>
+        </div>
+      </section>
+      <footer class="footer"><p>Church Ledger <span>/</span> Version 0.1.0</p><p>&#128274; Your information stays on your computer</p></footer>
+    </main>
+  </body>
+</html>

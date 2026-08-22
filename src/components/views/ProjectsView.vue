@@ -9,7 +9,10 @@ import type { Project, ProjectBalanceRow } from "../../lib/types";
 type ProjectStatusFilter = "all" | "active" | "paused" | "completed";
 
 const props = defineProps<{ sessionToken: string }>();
-const emit = defineEmits<{ (e: "open-project", id: number): void }>();
+const emit = defineEmits<{
+  (e: "open-project", id: number): void;
+  (e: "open-documentation"): void;
+}>();
 
 const loading = ref(true);
 const errorMessage = ref<string | null>(null);
@@ -18,6 +21,7 @@ const balances = ref<ProjectBalanceRow[]>([]);
 const searchQuery = ref("");
 const statusFilter = ref<ProjectStatusFilter>("all");
 
+const showCreateChooser = ref(false);
 const showAddProject = ref(false);
 const formName = ref("");
 const formTarget = ref("");
@@ -41,6 +45,20 @@ function statusTone(value: string) {
 
 function projectCode(id: number) {
   return `PRJ-${String(id).padStart(3, "0")}`;
+}
+
+function openCreateChooser() {
+  showCreateChooser.value = true;
+}
+
+function chooseProject() {
+  showCreateChooser.value = false;
+  showAddProject.value = true;
+}
+
+function chooseDocumentation() {
+  showCreateChooser.value = false;
+  emit("open-documentation");
 }
 
 const balanceByProjectId = computed(() => new Map(balances.value.map((row) => [row.project_id, row])));
@@ -210,13 +228,13 @@ onMounted(load);
           <button
             type="button"
             class="inline-flex items-center gap-2 rounded-xl border border-[#243858] bg-[#243858] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#1f2f4a]"
-            @click="showAddProject = true"
+            @click="openCreateChooser"
           >
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M12 5v14" />
               <path d="M5 12h14" />
             </svg>
-            New Project
+            New Record
           </button>
         </div>
       </div>
@@ -387,14 +405,54 @@ onMounted(load);
     <button
       type="button"
       class="fixed bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#243858] text-white shadow-2xl shadow-[#243858]/25 transition hover:bg-[#1d2c45]"
-      title="Add project"
-      @click="showAddProject = true"
+      title="Add record"
+      @click="openCreateChooser"
     >
       <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true">
         <path d="M12 5v14" />
         <path d="M5 12h14" />
       </svg>
     </button>
+
+    <div v-if="showCreateChooser" class="fixed inset-0 z-50">
+      <div class="absolute inset-0 bg-black/50" @click="showCreateChooser = false"></div>
+      <div class="absolute inset-0 flex items-center justify-center p-4">
+        <div class="w-full max-w-2xl rounded-[22px] border border-[#d7c49a] bg-[#fbf7eb] p-6 shadow-2xl">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <div class="ledger-heading text-3xl font-normal text-[#1f3558]">New Record</div>
+              <div class="mt-1 text-sm text-[#6a6b5d]">Choose whether to create a project or documentation record.</div>
+            </div>
+            <button class="rounded-lg border border-[#d7c49a] bg-white px-3 py-2 text-sm font-semibold text-[#243858] transition hover:bg-[#f4ecd7]" @click="showCreateChooser = false">
+              Close
+            </button>
+          </div>
+
+          <div class="mt-6 grid gap-3 md:grid-cols-2">
+            <button
+              type="button"
+              class="rounded-[18px] border border-[#d7c49a] bg-white p-5 text-left transition hover:bg-[#f4ecd7]"
+              @click="chooseProject"
+            >
+              <div class="text-lg font-semibold text-[#1f3558]">Project</div>
+              <p class="mt-2 text-sm leading-6 text-[#6a6b5d]">
+                Create a fund drive with a target budget, status, and date range.
+              </p>
+            </button>
+            <button
+              type="button"
+              class="rounded-[18px] border border-[#d7c49a] bg-white p-5 text-left transition hover:bg-[#f4ecd7]"
+              @click="chooseDocumentation"
+            >
+              <div class="text-lg font-semibold text-[#1f3558]">Documentation</div>
+              <p class="mt-2 text-sm leading-6 text-[#6a6b5d]">
+                Record post-event registration funds with the event name and fee collected.
+              </p>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div v-if="showAddProject" class="fixed inset-0 z-50">
       <div class="absolute inset-0 bg-black/50" @click="showAddProject = false"></div>

@@ -152,9 +152,74 @@ ORDER BY status ASC, name ASC
                 ])?;
             }
         }
+        "documentations" => {
+            wtr.write_record([
+                "id",
+                "event_name",
+                "event_date",
+                "registration_collected_cents",
+                "expenses_cents",
+                "balance_cents",
+                "expense_id",
+                "expense_spent_at",
+                "expense_amount_cents",
+                "expense_payee",
+                "notes",
+            ])?;
+            let mut stmt = conn.prepare(
+                r#"
+SELECT
+  d.id,
+  d.event_name,
+  d.event_date,
+  d.registration_collected_cents,
+  COALESCE((SELECT SUM(e.amount_cents) FROM documentation_expenses e WHERE e.documentation_id=d.id), 0) AS expenses_cents,
+  d.registration_collected_cents - COALESCE((SELECT SUM(e.amount_cents) FROM documentation_expenses e WHERE e.documentation_id=d.id), 0) AS balance_cents,
+  e.id AS expense_id,
+  e.spent_at AS expense_spent_at,
+  e.amount_cents AS expense_amount_cents,
+  e.payee AS expense_payee,
+  COALESCE(e.notes, d.notes) AS notes
+FROM documentations d
+LEFT JOIN documentation_expenses e ON e.documentation_id = d.id
+ORDER BY d.event_date DESC, d.id DESC, e.spent_at DESC, e.id DESC
+"#,
+            )?;
+            let rows = stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, i64>(4)?,
+                    row.get::<_, i64>(5)?,
+                    row.get::<_, Option<i64>>(6)?,
+                    row.get::<_, Option<String>>(7)?,
+                    row.get::<_, Option<i64>>(8)?,
+                    row.get::<_, Option<String>>(9)?,
+                    row.get::<_, Option<String>>(10)?,
+                ))
+            })?;
+            for r in rows {
+                let (id, event_name, event_date, collected, expenses, balance, expense_id, expense_spent_at, expense_amount_cents, expense_payee, notes) = r?;
+                wtr.write_record([
+                    id.to_string(),
+                    event_name,
+                    event_date,
+                    collected.to_string(),
+                    expenses.to_string(),
+                    balance.to_string(),
+                    expense_id.map(|v| v.to_string()).unwrap_or_default(),
+                    expense_spent_at.unwrap_or_default(),
+                    expense_amount_cents.map(|v| v.to_string()).unwrap_or_default(),
+                    expense_payee.unwrap_or_default(),
+                    notes.unwrap_or_default(),
+                ])?;
+            }
+        }
         _ => {
             return Err(AppError::InvalidInput(
-                "invalid export kind (use donations|expenses|projects)".to_string(),
+                "invalid export kind (use donations|expenses|projects|documentations)".to_string(),
             ));
         }
     }

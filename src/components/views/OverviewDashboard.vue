@@ -22,6 +22,7 @@ const emit = defineEmits<{
   (e: "open-projects"): void;
   (e: "open-donations"): void;
   (e: "open-expenses"): void;
+  (e: "open-create-record"): void;
 }>();
 
 const loading = ref(true);
@@ -165,13 +166,13 @@ onMounted(load);
           <button
             type="button"
             class="inline-flex items-center gap-2 rounded-xl border border-[#243858] bg-[#243858] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#1f2f4a]"
-            @click="emit('open-donations')"
+            @click="emit('open-create-record')"
           >
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M12 5v14" />
               <path d="M5 12h14" />
             </svg>
-            Record Entry
+            New Record
           </button>
         </div>
       </div>
@@ -331,9 +332,9 @@ onMounted(load);
                 <button
                   type="button"
                   class="rounded-xl border border-[#d7c49a] bg-[#fbf7eb] px-4 py-2 text-sm font-semibold text-[#243858] transition hover:bg-[#f4ecd7]"
-                  @click="emit('open-donations')"
+                  @click="emit('open-create-record')"
                 >
-                  Contribution
+                  New Record
                 </button>
                 <button
                   type="button"
@@ -352,8 +353,8 @@ onMounted(load);
     <button
       type="button"
       class="fixed bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#243858] text-white shadow-2xl shadow-[#243858]/25 transition hover:bg-[#1d2c45]"
-      title="Record entry"
-      @click="emit('open-donations')"
+      title="New record"
+      @click="emit('open-create-record')"
     >
       <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" aria-hidden="true">
         <path d="M12 5v14" />

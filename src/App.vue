@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { Moon, Sun } from "lucide-vue-next";
-import { appStatus, bootstrapAdmin, login, logout } from "./lib/api";
+import { appStatus, logout } from "./lib/api";
 import { notify } from "./lib/feedback";
+import DownloadPage from "./components/DownloadPage.vue";
 import SetupAdmin from "./components/SetupAdmin.vue";
 import LoginPage from "./components/LoginPage.vue";
-import ForgotPasswordPage from "./components/ForgotPasswordPage.vue";
+import ForgotPasscodePage from "./components/ForgotPasscodePage.vue";
 import MainApp from "./components/MainApp.vue";
 
 const THEME_KEY = "pft_theme_mode";
@@ -20,8 +21,15 @@ const toast = ref<string | null>(null);
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 const themeMode = ref<"light" | "dark">(localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light");
 const authScreen = ref<"login" | "forgot">("login");
+const currentPath = ref(window.location.pathname);
 
 const isAuthed = computed(() => !!sessionToken.value);
+const isDownloadRoute = computed(() => currentPath.value === "/download" || currentPath.value === "/download/");
+const isTauriRuntime = computed(
+  () =>
+    typeof window !== "undefined" &&
+    typeof (window as any).__TAURI_INTERNALS__?.invoke === "function",
+);
 
 function showToast(message: string) {
   toast.value = message;
@@ -47,14 +55,12 @@ async function refreshStatus() {
   appDataDir.value = status.app_data_dir;
 }
 
-async function handleBootstrap(password: string) {
+async function handleBootstrapSuccess(sessionTokenValue: string) {
   errorMessage.value = null;
-  await bootstrapAdmin(password);
-  const res = await login(password);
-  sessionToken.value = res.session_token;
-  localStorage.setItem("pft_session_token", res.session_token);
+  sessionToken.value = sessionTokenValue;
+  localStorage.setItem("pft_session_token", sessionTokenValue);
   await refreshStatus();
-  notify("Admin password created.");
+  notify("Admin passcode created.");
 }
 
 function handleLoginSuccess(token: string) {
@@ -63,7 +69,7 @@ function handleLoginSuccess(token: string) {
   notify("Logged in.");
 }
 
-function handleOpenForgotPassword() {
+function handleOpenForgotPasscode() {
   authScreen.value = "forgot";
 }
 
@@ -71,9 +77,9 @@ function handleBackToLogin() {
   authScreen.value = "login";
 }
 
-function handlePasswordReplaced() {
+function handleRecoveryComplete() {
   authScreen.value = "login";
-  notify("Password replaced. Sign in with the new password.");
+  notify("Passcode replaced. Sign in with the new passcode.");
 }
 
 async function handleLogout() {
@@ -100,7 +106,14 @@ watch(themeMode, () => {
 });
 
 onMounted(async () => {
+  window.addEventListener("popstate", () => {
+    currentPath.value = window.location.pathname;
+  });
   applyTheme();
+  if (isDownloadRoute.value || !isTauriRuntime.value) {
+    loading.value = false;
+    return;
+  }
   window.addEventListener("pft:toast", (event: Event) => {
     const detail = (event as CustomEvent).detail;
     if (typeof detail === "string" && detail.trim()) {
@@ -128,7 +141,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div :class="themeMode === 'dark' ? 'h-full overflow-hidden bg-slate-950 text-slate-100' : 'h-full overflow-hidden bg-slate-50 text-slate-900'">
+  <DownloadPage v-if="isDownloadRoute || !isTauriRuntime" />
+
+  <div
+    v-else
+    :class="themeMode === 'dark' ? 'h-full overflow-hidden bg-slate-950 text-slate-100' : 'h-full overflow-hidden bg-slate-50 text-slate-900'"
+  >
     <button
       type="button"
       class="fixed right-4 top-4 z-50 inline-flex h-10 w-10 items-center justify-center rounded-[2px] border border-slate-300 bg-white text-slate-900 shadow-sm transition hover:bg-slate-50"
@@ -165,19 +183,19 @@ onMounted(async () => {
         v-if="!hasAdmin"
         :db-path="dbPath"
         :app-data-dir="appDataDir"
-        @bootstrap="handleBootstrap"
+        @bootstrap-success="handleBootstrapSuccess"
       />
 
       <LoginPage
         v-else-if="!isAuthed && authScreen === 'login'"
         @login-success="handleLoginSuccess"
-        @forgot-password="handleOpenForgotPassword"
+        @forgot-passcode="handleOpenForgotPasscode"
       />
 
-      <ForgotPasswordPage
+      <ForgotPasscodePage
         v-else-if="!isAuthed && authScreen === 'forgot'"
         @back-to-login="handleBackToLogin"
-        @password-replaced="handlePasswordReplaced"
+        @passcode-replaced="handleRecoveryComplete"
       />
 
       <MainApp v-else :session-token="sessionToken!" :theme-mode="themeMode" @logout="handleLogout" />

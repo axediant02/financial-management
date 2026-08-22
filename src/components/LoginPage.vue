@@ -4,10 +4,10 @@ import { login } from "../lib/api";
 
 const emit = defineEmits<{
   (e: "login-success", sessionToken: string): void;
-  (e: "forgot-password"): void;
+  (e: "forgot-passcode"): void;
 }>();
 
-const password = ref("");
+const passcode = ref("");
 const submitting = ref(false);
 const errorMessage = ref<string | null>(null);
 const successMessage = ref<string | null>(null);
@@ -17,10 +17,10 @@ async function handleLogin() {
   successMessage.value = null;
   submitting.value = true;
   try {
-    const res = await login(password.value);
+    const res = await login(passcode.value);
     emit("login-success", res.session_token);
     successMessage.value = "Login successful.";
-    password.value = "";
+    passcode.value = "";
   } catch (e: any) {
     successMessage.value = null;
     errorMessage.value = "Login failed. Check your password and try again.";
@@ -51,7 +51,7 @@ async function handleLogin() {
 
         <form @submit.prevent="handleLogin" class="space-y-5">
           <div>
-            <label for="password" class="block text-sm font-medium text-slate-300 mb-2">Password</label>
+            <label for="passcode" class="block text-sm font-medium text-slate-300 mb-2">Passcode</label>
             <div class="relative">
               <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -59,10 +59,10 @@ async function handleLogin() {
                 </svg>
               </div>
               <input
-                v-model="password"
+                v-model="passcode"
                 type="password"
-                id="password"
-                placeholder="Enter your password"
+                id="passcode"
+                placeholder="Enter your passcode"
                 class="w-full bg-slate-900/50 border border-slate-600 rounded-xl py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                 required
               />
@@ -96,12 +96,12 @@ async function handleLogin() {
           <button
             type="button"
             class="text-sm font-semibold text-emerald-200 hover:text-emerald-100 transition-colors"
-            @click="emit('forgot-password')"
+            @click="emit('forgot-passcode')"
           >
-            Forgot password?
+            Forgot passcode?
           </button>
           <p class="mt-1 text-xs text-slate-400">
-            Open the replacement flow to generate a one-time code and set a new password.
+            Open the replacement flow to generate a one-time code and set a new passcode.
           </p>
         </div>
       </div>
