@@ -2,16 +2,13 @@
 import {
   ArrowDownToLine,
   Check,
-  HardDrive,
   LockKeyhole,
-  Monitor,
   Package,
   ShieldCheck,
 } from "lucide-vue-next";
 
 const version = "0.1.0";
 const msiHref = "/download/financial-system_0.1.0_x64_en-US.msi";
-const exeHref = "/download/financial-system_0.1.0_x64-setup.exe";
 
 const features = [
   {
@@ -76,12 +73,6 @@ const features = [
               <ArrowDownToLine class="size-4 transition-transform group-hover:translate-y-0.5" />
               Download the app
             </a>
-            <a
-              :href="exeHref"
-              class="inline-flex h-14 items-center justify-center gap-3 rounded-xl border border-white/15 bg-white/[0.04] px-6 text-sm font-semibold text-[#e4eaf1] transition hover:border-[#d9b866]/50 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d9b866] focus-visible:ring-offset-2 focus-visible:ring-offset-[#060d1b]"
-            >
-              Other download option
-            </a>
           </div>
           <div class="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#718197]">
             <span class="inline-flex items-center gap-2"><Check class="size-3 text-[#73b587]" /> For Windows 10 and 11</span>
@@ -126,28 +117,6 @@ const features = [
             <h2 class="mt-3 text-base font-semibold tracking-[-0.015em] text-[#eef2f6]">{{ feature.title }}</h2>
             <p class="mt-2 max-w-sm text-sm leading-6 text-[#8795a9]">{{ feature.description }}</p>
           </article>
-        </div>
-      </section>
-
-      <section class="grid gap-6 py-16 lg:grid-cols-[1fr_1.3fr] lg:items-center lg:py-20">
-        <div>
-          <div class="mb-5 inline-flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.3em] text-[#d9b866]"><span class="h-px w-7 bg-[#d9b866]" /> Choose how to install</div>
-          <h2 class="max-w-md font-serif text-4xl leading-tight tracking-[-0.04em] text-[#f5f2eb]">Start keeping better records.</h2>
-          <p class="mt-5 max-w-md text-sm leading-7 text-[#8795a9]">Choose the recommended download for the easiest setup. Both options install the same Church Ledger app.</p>
-        </div>
-        <div class="grid gap-3 sm:grid-cols-2">
-          <a :href="msiHref" class="group rounded-2xl border border-[#d9b866]/45 bg-[#d9b866]/[0.08] p-5 transition hover:-translate-y-1 hover:border-[#d9b866] hover:bg-[#d9b866]/[0.13] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d9b866]">
-            <div class="flex items-center justify-between"><span class="flex size-10 items-center justify-center rounded-xl bg-[#d9b866] text-[#091221]"><Monitor class="size-5" /></span><span class="text-[10px] font-bold uppercase tracking-[0.2em] text-[#d9b866]">Best choice</span></div>
-            <h3 class="mt-7 text-lg font-semibold text-[#f5f2eb]">Recommended download</h3>
-            <p class="mt-2 text-sm leading-6 text-[#98a7b9]">The easiest option for most people using a Windows computer.</p>
-            <span class="mt-6 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-[#d9b866]">Download now <ArrowDownToLine class="size-3 transition-transform group-hover:translate-y-0.5" /></span>
-          </a>
-          <a :href="exeHref" class="group rounded-2xl border border-white/12 bg-white/[0.035] p-5 transition hover:-translate-y-1 hover:border-white/25 hover:bg-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d9b866]">
-            <div class="flex items-center justify-between"><span class="flex size-10 items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] text-[#d9b866]"><HardDrive class="size-5" /></span><span class="text-[10px] font-bold uppercase tracking-[0.2em] text-[#718197]">Other option</span></div>
-            <h3 class="mt-7 text-lg font-semibold text-[#f5f2eb]">Other download</h3>
-            <p class="mt-2 text-sm leading-6 text-[#98a7b9]">Try this option if the recommended download does not work.</p>
-            <span class="mt-6 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-[#b9c4d1]">Try this download <ArrowDownToLine class="size-3 transition-transform group-hover:translate-y-0.5" /></span>
-          </a>
         </div>
       </section>
 
