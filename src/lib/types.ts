@@ -149,3 +149,13 @@ export type DatabaseHealth = {
   checked_at: string;
   record_count: number;
 };
+
+export type AuditEvent = {
+  id: number;
+  actor: string;
+  action: string;
+  entity: string;
+  record_id?: number | null;
+  summary: string;
+  created_at: string;
+};

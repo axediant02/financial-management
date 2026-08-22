@@ -9,12 +9,14 @@ import ProjectsView from "./views/ProjectsView.vue";
 import DocumentationView from "./views/DocumentationView.vue";
 import ReportsView from "./views/ReportsView.vue";
 import BackupsView from "./views/BackupsView.vue";
+import AuditTrailView from "./views/AuditTrailView.vue";
 import ProjectDetailView from "./views/ProjectDetailView.vue";
+import { isDemoMode } from "../lib/demo-api";
 
 const props = defineProps<{ sessionToken: string; themeMode: "light" | "dark" }>();
 const emit = defineEmits<{ (e: "logout"): void }>();
 
-type Tab = "overview" | "donations" | "expenses" | "projects" | "documentation" | "reports" | "backups";
+type Tab = "overview" | "donations" | "expenses" | "projects" | "documentation" | "reports" | "backups" | "audit";
 type DetailTab = Tab | "project_detail";
 
 const NAV_TAB_KEY = "pft_nav_tab";
@@ -36,6 +38,7 @@ function isDetailTab(value: string): value is DetailTab {
     value === "documentation" ||
     value === "reports" ||
     value === "backups" ||
+    value === "audit" ||
     value === "project_detail"
   );
 }
@@ -48,7 +51,8 @@ function isTab(value: string): value is Tab {
     value === "projects" ||
     value === "documentation" ||
     value === "reports" ||
-    value === "backups"
+    value === "backups" ||
+    value === "audit"
   );
 }
 
@@ -64,6 +68,14 @@ onMounted(() => {
   }
   if (savedPrevTab && isTab(savedPrevTab)) {
     previousTab.value = savedPrevTab;
+  }
+  const requestedDemoTab = new URLSearchParams(window.location.search).get("tab");
+  if (isDemoMode && requestedDemoTab && isDetailTab(requestedDemoTab)) {
+    tab.value = requestedDemoTab;
+  }
+  const requestedDemoProject = Number(new URLSearchParams(window.location.search).get("project"));
+  if (isDemoMode && Number.isInteger(requestedDemoProject) && requestedDemoProject > 0) {
+    selectedProjectId.value = requestedDemoProject;
   }
   if (tab.value === "project_detail" && selectedProjectId.value == null) {
     tab.value = "projects";
@@ -172,6 +184,8 @@ function detailBackLabel() {
       return "Reports";
     case "backups":
       return "Backups";
+    case "audit":
+      return "Audit Trail";
     default:
       return "Previous page";
   }
@@ -339,6 +353,23 @@ function toggleSidebar() {
             </span>
             <span v-if="!sidebarCollapsed">Backups</span>
           </button>
+          <button
+            class="flex w-full items-center rounded-[10px] px-4 py-3 text-left text-sm font-semibold transition"
+            :class="[
+              tab === 'audit' ? 'bg-[#31476a] text-white shadow-inner' : 'text-[#d8e0ec] hover:bg-white/5',
+              sidebarCollapsed ? 'justify-center gap-0' : 'gap-3',
+            ]"
+            @click="tab = 'audit'"
+            :title="sidebarCollapsed ? 'Audit Trail' : undefined"
+          >
+            <span class="flex h-5 w-5 items-center justify-center">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M5 4h14v16H5z" />
+                <path d="M8 8h8M8 12h8M8 16h5" />
+              </svg>
+            </span>
+            <span v-if="!sidebarCollapsed">Audit Trail</span>
+          </button>
         </nav>
 
         <div class="mt-auto border-t border-[#334b6d] pt-4 text-sm" :class="sidebarCollapsed ? 'text-center' : ''">
@@ -404,6 +435,7 @@ function toggleSidebar() {
         <DonationsView v-else-if="tab === 'donations'" :session-token="sessionToken" />
         <ReportsView v-else-if="tab === 'reports'" :session-token="sessionToken" />
         <BackupsView v-else-if="tab === 'backups'" :session-token="sessionToken" />
+        <AuditTrailView v-else-if="tab === 'audit'" :session-token="sessionToken" />
         <ProjectDetailView
           v-else-if="tab === 'project_detail' && selectedProjectId != null"
           :session-token="sessionToken"

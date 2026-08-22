@@ -8,12 +8,13 @@ import SetupAdmin from "./components/SetupAdmin.vue";
 import LoginPage from "./components/LoginPage.vue";
 import ForgotPasscodePage from "./components/ForgotPasscodePage.vue";
 import MainApp from "./components/MainApp.vue";
+import { isDemoMode } from "./lib/demo-api";
 
 const THEME_KEY = "pft_theme_mode";
 
 const loading = ref(true);
 const hasAdmin = ref(false);
-const sessionToken = ref<string | null>(localStorage.getItem("pft_session_token"));
+const sessionToken = ref<string | null>(isDemoMode ? "demo-session" : localStorage.getItem("pft_session_token"));
 const dbPath = ref<string | null>(null);
 const appDataDir = ref<string | null>(null);
 const errorMessage = ref<string | null>(null);
@@ -24,9 +25,10 @@ const authScreen = ref<"login" | "forgot">("login");
 const currentPath = ref(window.location.pathname);
 
 const isAuthed = computed(() => !!sessionToken.value);
-const isDownloadRoute = computed(() => currentPath.value === "/download" || currentPath.value === "/download/");
+const isDownloadRoute = computed(() => !isDemoMode && (currentPath.value === "/download" || currentPath.value === "/download/"));
 const isTauriRuntime = computed(
   () =>
+    isDemoMode ||
     typeof window !== "undefined" &&
     typeof (window as any).__TAURI_INTERNALS__?.invoke === "function",
 );
@@ -141,7 +143,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <DownloadPage v-if="isDownloadRoute || !isTauriRuntime" />
+  <DownloadPage v-if="isDownloadRoute || (!isTauriRuntime && !isDemoMode)" />
 
   <div
     v-else

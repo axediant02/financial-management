@@ -16,10 +16,10 @@ fn map_err(e: AppError) -> String {
     e.to_string()
 }
 
-fn with_conn<T>(state: &AppState, f: impl FnOnce(&Connection) -> AppResult<T>) -> AppResult<T> {
-    let conn = db::open_db(&state.db_path)?;
+fn with_conn<T>(state: &AppState, f: impl FnOnce(&mut Connection) -> AppResult<T>) -> AppResult<T> {
+    let mut conn = db::open_db(&state.db_path)?;
     db::migrate(&conn)?;
-    f(&conn)
+    f(&mut conn)
 }
 
 fn require_session(state: &AppState, token: &str) -> AppResult<()> {
@@ -28,6 +28,30 @@ fn require_session(state: &AppState, token: &str) -> AppResult<()> {
     } else {
         Err(AppError::Unauthorized)
     }
+}
+
+fn record_audit(
+    conn: &Connection,
+    action: &str,
+    entity: &str,
+    record_id: Option<i64>,
+    summary: &str,
+) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO audit_events (actor, action, entity, record_id, summary, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params!["Admin", action, entity, record_id, summary, db::now_iso()],
+    )?;
+    Ok(())
+}
+
+fn record_audit_tx(
+    tx: &rusqlite::Transaction<'_>,
+    action: &str,
+    entity: &str,
+    record_id: Option<i64>,
+    summary: &str,
+) -> AppResult<()> {
+    record_audit(tx, action, entity, record_id, summary)
 }
 
 #[tauri::command]
@@ -72,6 +96,8 @@ pub fn complete_admin_password_replace(
 #[tauri::command]
 pub fn login(password: String, state: State<'_, AppState>) -> Result<AuthResult, String> {
     with_conn(&state, |conn| auth::verify_admin_password(conn, &password)).map_err(map_err)?;
+    with_conn(&state, |conn| record_audit(conn, "login", "session", None, "Administrator logged in"))
+        .map_err(map_err)?;
     Ok(AuthResult {
         session_token: state.sessions.create_session(),
     })
@@ -79,8 +105,41 @@ pub fn login(password: String, state: State<'_, AppState>) -> Result<AuthResult,
 
 #[tauri::command]
 pub fn logout(session_token: String, state: State<'_, AppState>) -> Result<(), String> {
+    require_session(&state, &session_token).map_err(map_err)?;
     state.sessions.invalidate(&session_token);
+    with_conn(&state, |conn| record_audit(conn, "logout", "session", None, "Administrator logged out"))
+        .map_err(map_err)?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn audit_trail_list(
+    session_token: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<AuditEvent>, String> {
+    require_session(&state, &session_token).map_err(map_err)?;
+    with_conn(&state, |conn| {
+        let mut stmt = conn.prepare(
+            "SELECT id, actor, action, entity, record_id, summary, created_at FROM audit_events ORDER BY created_at DESC, id DESC LIMIT 500",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(AuditEvent {
+                id: row.get(0)?,
+                actor: row.get(1)?,
+                action: row.get(2)?,
+                entity: row.get(3)?,
+                record_id: row.get(4)?,
+                summary: row.get(5)?,
+                created_at: row.get(6)?,
+            })
+        })?;
+        let mut events = Vec::new();
+        for row in rows {
+            events.push(row?);
+        }
+        Ok(events)
+    })
+    .map_err(map_err)
 }
 
 #[tauri::command]
@@ -118,11 +177,15 @@ pub fn donors_create(
         return Err("invalid input: donor name required".to_string());
     }
     let id = with_conn(&state, |conn| {
-        conn.execute(
+        let tx = conn.transaction()?;
+        tx.execute(
             "INSERT INTO donors (name, notes, created_at) VALUES (?1, ?2, ?3)",
             params![payload.name.trim(), payload.notes, db::now_iso()],
         )?;
-        Ok(conn.last_insert_rowid())
+        let id = tx.last_insert_rowid();
+        record_audit_tx(&tx, "create", "donor", Some(id), &format!("Created donor record #{id}"))?;
+        tx.commit()?;
+        Ok(id)
     })
     .map_err(map_err)?;
     Ok(IdResult { id })
@@ -136,7 +199,13 @@ pub fn donors_delete(
 ) -> Result<(), String> {
     require_session(&state, &session_token).map_err(map_err)?;
     with_conn(&state, |conn| {
-        conn.execute("DELETE FROM donors WHERE id=?1", params![id])?;
+        let tx = conn.transaction()?;
+        let changed = tx.execute("DELETE FROM donors WHERE id=?1", params![id])?;
+        if changed == 0 {
+            return Err(AppError::InvalidInput("donor record not found".to_string()));
+        }
+        record_audit_tx(&tx, "delete", "donor", Some(id), &format!("Deleted donor record #{id}"))?;
+        tx.commit()?;
         Ok(())
     })
     .map_err(map_err)?;
@@ -181,11 +250,18 @@ pub fn categories_create(
         return Err("invalid input: category name required".to_string());
     }
     let id = with_conn(&state, |conn| {
-        conn.execute(
+        let tx = conn.transaction()?;
+        let changed = tx.execute(
             "INSERT INTO categories (name, created_at) VALUES (?1, ?2)",
             params![payload.name.trim(), db::now_iso()],
         )?;
-        Ok(conn.last_insert_rowid())
+        if changed == 0 {
+            return Err(AppError::InvalidInput("project record not found".to_string()));
+        }
+        let id = tx.last_insert_rowid();
+        record_audit_tx(&tx, "create", "category", Some(id), &format!("Created category record #{id}"))?;
+        tx.commit()?;
+        Ok(id)
     })
     .map_err(map_err)?;
     Ok(IdResult { id })
@@ -239,7 +315,8 @@ pub fn projects_create(
     }
     let status = payload.status.unwrap_or_else(|| "active".to_string());
     let id = with_conn(&state, |conn| {
-        conn.execute(
+        let tx = conn.transaction()?;
+        tx.execute(
             r#"
 INSERT INTO projects (name, description, target_amount_cents, status, start_date, end_date, created_at)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
@@ -254,7 +331,10 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
                 db::now_iso()
             ],
         )?;
-        Ok(conn.last_insert_rowid())
+        let id = tx.last_insert_rowid();
+        record_audit_tx(&tx, "create", "project", Some(id), &format!("Created project record #{id}"))?;
+        tx.commit()?;
+        Ok(id)
     })
     .map_err(map_err)?;
     Ok(IdResult { id })
@@ -272,7 +352,8 @@ pub fn projects_update(
         return Err("invalid input: project name required".to_string());
     }
     with_conn(&state, |conn| {
-        conn.execute(
+        let tx = conn.transaction()?;
+        tx.execute(
             r#"
 UPDATE projects
 SET name=?1, description=?2, target_amount_cents=?3, status=?4, start_date=?5, end_date=?6
@@ -288,6 +369,8 @@ WHERE id=?7
                 id
             ],
         )?;
+        record_audit_tx(&tx, "update", "project", Some(id), &format!("Updated project record #{id}"))?;
+        tx.commit()?;
         Ok(())
     })
     .map_err(map_err)?;
@@ -302,7 +385,13 @@ pub fn projects_delete(
 ) -> Result<(), String> {
     require_session(&state, &session_token).map_err(map_err)?;
     with_conn(&state, |conn| {
-        conn.execute("DELETE FROM projects WHERE id=?1", params![id])?;
+        let tx = conn.transaction()?;
+        let changed = tx.execute("DELETE FROM projects WHERE id=?1", params![id])?;
+        if changed == 0 {
+            return Err(AppError::InvalidInput("project record not found".to_string()));
+        }
+        record_audit_tx(&tx, "delete", "project", Some(id), &format!("Deleted project record #{id}"))?;
+        tx.commit()?;
         Ok(())
     })
     .map_err(map_err)?;
@@ -376,7 +465,8 @@ pub fn documentations_create(
         return Err("invalid input: registration collected must be > 0".to_string());
     }
     let id = with_conn(&state, |conn| {
-        conn.execute(
+        let tx = conn.transaction()?;
+        tx.execute(
             r#"
 INSERT INTO documentations (event_name, event_date, registration_fee_cents, registration_collected_cents, notes, created_at)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
@@ -390,7 +480,10 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6)
                 db::now_iso()
             ],
         )?;
-        Ok(conn.last_insert_rowid())
+        let id = tx.last_insert_rowid();
+        record_audit_tx(&tx, "create", "documentation", Some(id), &format!("Created documentation record #{id}"))?;
+        tx.commit()?;
+        Ok(id)
     })
     .map_err(map_err)?;
     Ok(IdResult { id })
@@ -408,7 +501,8 @@ pub fn documentation_expenses_create(
         return Err("invalid input: expense amount must be > 0".to_string());
     }
     let id = with_conn(&state, |conn| {
-        conn.execute(
+        let tx = conn.transaction()?;
+        tx.execute(
             r#"
 INSERT INTO documentation_expenses (documentation_id, spent_at, amount_cents, payee, notes, created_at)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
@@ -422,7 +516,10 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6)
                 db::now_iso()
             ],
         )?;
-        Ok(conn.last_insert_rowid())
+        let id = tx.last_insert_rowid();
+        record_audit_tx(&tx, "create", "documentation expense", Some(id), &format!("Created documentation expense record #{id}"))?;
+        tx.commit()?;
+        Ok(id)
     })
     .map_err(map_err)?;
     Ok(IdResult { id })
@@ -436,7 +533,13 @@ pub fn documentation_expenses_delete(
 ) -> Result<(), String> {
     require_session(&state, &session_token).map_err(map_err)?;
     with_conn(&state, |conn| {
-        conn.execute("DELETE FROM documentation_expenses WHERE id=?1", params![id])?;
+        let tx = conn.transaction()?;
+        let changed = tx.execute("DELETE FROM documentation_expenses WHERE id=?1", params![id])?;
+        if changed == 0 {
+            return Err(AppError::InvalidInput("documentation expense record not found".to_string()));
+        }
+        record_audit_tx(&tx, "delete", "documentation expense", Some(id), &format!("Deleted documentation expense record #{id}"))?;
+        tx.commit()?;
         Ok(())
     })
     .map_err(map_err)?;
@@ -451,7 +554,13 @@ pub fn documentations_delete(
 ) -> Result<(), String> {
     require_session(&state, &session_token).map_err(map_err)?;
     with_conn(&state, |conn| {
-        conn.execute("DELETE FROM documentations WHERE id=?1", params![id])?;
+        let tx = conn.transaction()?;
+        let changed = tx.execute("DELETE FROM documentations WHERE id=?1", params![id])?;
+        if changed == 0 {
+            return Err(AppError::InvalidInput("documentation record not found".to_string()));
+        }
+        record_audit_tx(&tx, "delete", "documentation", Some(id), &format!("Deleted documentation record #{id}"))?;
+        tx.commit()?;
         Ok(())
     })
     .map_err(map_err)?;
@@ -566,7 +675,8 @@ pub fn donations_create(
         return Err("invalid input: donation amount must be > 0".to_string());
     }
     let id = with_conn(&state, |conn| {
-        conn.execute(
+        let tx = conn.transaction()?;
+        let changed = tx.execute(
             r#"
 INSERT INTO donations (donated_at, amount_cents, donor_id, anonymous, notes, project_id, created_at)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
@@ -581,7 +691,13 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
                 db::now_iso()
             ],
         )?;
-        Ok(conn.last_insert_rowid())
+        if changed == 0 {
+            return Err(AppError::InvalidInput("contribution record not found".to_string()));
+        }
+        let id = tx.last_insert_rowid();
+        record_audit_tx(&tx, "create", "donation", Some(id), &format!("Created contribution record #{id}"))?;
+        tx.commit()?;
+        Ok(id)
     })
     .map_err(map_err)?;
     Ok(IdResult { id })
@@ -600,7 +716,8 @@ pub fn donations_update(
         return Err("invalid input: donation amount must be > 0".to_string());
     }
     with_conn(&state, |conn| {
-        conn.execute(
+        let tx = conn.transaction()?;
+        tx.execute(
             r#"
 UPDATE donations
 SET donated_at=?1, amount_cents=?2, donor_id=?3, anonymous=?4, notes=?5, project_id=?6
@@ -616,6 +733,8 @@ WHERE id=?7
                 id
             ],
         )?;
+        record_audit_tx(&tx, "update", "donation", Some(id), &format!("Updated contribution record #{id}"))?;
+        tx.commit()?;
         Ok(())
     })
     .map_err(map_err)?;
@@ -630,7 +749,13 @@ pub fn donations_delete(
 ) -> Result<(), String> {
     require_session(&state, &session_token).map_err(map_err)?;
     with_conn(&state, |conn| {
-        conn.execute("DELETE FROM donations WHERE id=?1", params![id])?;
+        let tx = conn.transaction()?;
+        let changed = tx.execute("DELETE FROM donations WHERE id=?1", params![id])?;
+        if changed == 0 {
+            return Err(AppError::InvalidInput("contribution record not found".to_string()));
+        }
+        record_audit_tx(&tx, "delete", "donation", Some(id), &format!("Deleted contribution record #{id}"))?;
+        tx.commit()?;
         Ok(())
     })
     .map_err(map_err)?;
@@ -690,7 +815,8 @@ pub fn expenses_create(
         return Err("invalid input: expense amount must be > 0".to_string());
     }
     let id = with_conn(&state, |conn| {
-        conn.execute(
+        let tx = conn.transaction()?;
+        let changed = tx.execute(
             r#"
 INSERT INTO expenses (spent_at, amount_cents, category_id, payee, notes, project_id, created_at)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
@@ -705,7 +831,13 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
                 db::now_iso()
             ],
         )?;
-        Ok(conn.last_insert_rowid())
+        if changed == 0 {
+            return Err(AppError::InvalidInput("expense record not found".to_string()));
+        }
+        let id = tx.last_insert_rowid();
+        record_audit_tx(&tx, "create", "expense", Some(id), &format!("Created expense record #{id}"))?;
+        tx.commit()?;
+        Ok(id)
     })
     .map_err(map_err)?;
     Ok(IdResult { id })
@@ -724,7 +856,8 @@ pub fn expenses_update(
         return Err("invalid input: expense amount must be > 0".to_string());
     }
     with_conn(&state, |conn| {
-        conn.execute(
+        let tx = conn.transaction()?;
+        tx.execute(
             r#"
 UPDATE expenses
 SET spent_at=?1, amount_cents=?2, category_id=?3, payee=?4, notes=?5, project_id=?6
@@ -740,6 +873,8 @@ WHERE id=?7
                 id
             ],
         )?;
+        record_audit_tx(&tx, "update", "expense", Some(id), &format!("Updated expense record #{id}"))?;
+        tx.commit()?;
         Ok(())
     })
     .map_err(map_err)?;
@@ -754,7 +889,13 @@ pub fn expenses_delete(
 ) -> Result<(), String> {
     require_session(&state, &session_token).map_err(map_err)?;
     with_conn(&state, |conn| {
-        conn.execute("DELETE FROM expenses WHERE id=?1", params![id])?;
+        let tx = conn.transaction()?;
+        let changed = tx.execute("DELETE FROM expenses WHERE id=?1", params![id])?;
+        if changed == 0 {
+            return Err(AppError::InvalidInput("expense record not found".to_string()));
+        }
+        record_audit_tx(&tx, "delete", "expense", Some(id), &format!("Deleted expense record #{id}"))?;
+        tx.commit()?;
         Ok(())
     })
     .map_err(map_err)?;
@@ -836,7 +977,12 @@ pub fn export_csv_command(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     require_session(&state, &session_token).map_err(map_err)?;
-    with_conn(&state, |conn| export::export_csv(conn, req)).map_err(map_err)?;
+    let kind = req.kind.clone();
+    with_conn(&state, |conn| {
+        export::export_csv(conn, req)?;
+        record_audit(conn, "export", "report", None, &format!("Exported {kind} CSV report"))
+    })
+    .map_err(map_err)?;
     Ok(())
 }
 
@@ -847,9 +993,11 @@ pub fn export_pdf_command(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     require_session(&state, &session_token).map_err(map_err)?;
+    let title = req.title.clone();
     with_conn(&state, |conn| {
         let summary = export::compute_summary(conn, &req.filter)?;
-        export::export_pdf_summary(conn, req, summary)
+        export::export_pdf_summary(conn, req, summary)?;
+        record_audit(conn, "export", "report", None, "Exported PDF report")
     })
     .map_err(map_err)?;
     Ok(())
@@ -868,6 +1016,10 @@ pub fn backup_create(session_token: String, app: AppHandle, state: State<'_, App
     let dir = paths::backups_dir(&app).map_err(map_err)?;
     let path = backup::create_backup_file(&state.db_path, &dir).map_err(map_err)?;
     backup::rotate_backups(&dir).map_err(map_err)?;
+    with_conn(&state, |conn| {
+        record_audit(conn, "backup", "database", None, "Created database backup")
+    })
+    .map_err(map_err)?;
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -878,6 +1030,7 @@ pub fn backup_restore(session_token: String, src_path: String, state: State<'_, 
     // Validate/migrate after restore
     let conn = db::open_db(&state.db_path).map_err(map_err)?;
     db::migrate(&conn).map_err(map_err)?;
+    record_audit(&conn, "restore", "database", None, "Restored database backup").map_err(map_err)?;
     Ok(())
 }
 

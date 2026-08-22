@@ -280,3 +280,14 @@ pub struct DatabaseHealth {
     pub checked_at: String,
     pub record_count: i64,
 }
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AuditEvent {
+    pub id: i64,
+    pub actor: String,
+    pub action: String,
+    pub entity: String,
+    pub record_id: Option<i64>,
+    pub summary: String,
+    pub created_at: String,
+}

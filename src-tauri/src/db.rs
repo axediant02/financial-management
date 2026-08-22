@@ -5,7 +5,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::error::{AppError, AppResult};
 
-pub const SCHEMA_VERSION: i64 = 4;
+pub const SCHEMA_VERSION: i64 = 5;
 
 pub fn open_db(path: &Path) -> AppResult<Connection> {
     let conn = Connection::open(path)?;
@@ -201,6 +201,26 @@ CREATE INDEX IF NOT EXISTS idx_documentation_expenses_documentation_id ON docume
 CREATE INDEX IF NOT EXISTS idx_documentation_expenses_spent_at ON documentation_expenses(spent_at);
 
 INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '4');
+"#,
+        )?;
+    }
+
+    if current_version < 5 {
+        conn.execute_batch(
+            r#"
+CREATE TABLE IF NOT EXISTS audit_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor TEXT NOT NULL,
+  action TEXT NOT NULL,
+  entity TEXT NOT NULL,
+  record_id INTEGER,
+  summary TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_events_created_at ON audit_events(created_at DESC, id DESC);
+
+INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '5');
 "#,
         )?;
     }

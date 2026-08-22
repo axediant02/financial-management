@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
+import { demoInvoke, isDemoMode } from "./demo-api";
 import type {
   AppStatus,
+  AuditEvent,
   AuthResult,
   BackupInfo,
   Category,
@@ -30,7 +32,7 @@ function isUnauthorizedError(e: unknown): boolean {
 
 async function invokeAuthed<T>(command: string, args: Record<string, unknown>): Promise<T> {
   try {
-    return await invoke<T>(command, args);
+    return await invokeCommand<T>(command, args);
   } catch (e) {
     if (isUnauthorizedError(e)) {
       localStorage.removeItem("pft_session_token");
@@ -40,31 +42,39 @@ async function invokeAuthed<T>(command: string, args: Record<string, unknown>): 
   }
 }
 
+async function invokeCommand<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {
+  return isDemoMode ? demoInvoke<T>(command, args) : invoke<T>(command, args);
+}
+
 export async function appStatus(): Promise<AppStatus> {
-  return await invoke("app_status");
+  return await invokeCommand("app_status");
 }
 
 export async function bootstrapAdmin(password: string): Promise<void> {
-  await invoke("bootstrap_admin", { password });
+  await invokeCommand("bootstrap_admin", { password });
 }
 
 export async function requestAdminPasswordReplace(): Promise<PasswordReplaceChallenge> {
-  return await invoke("request_admin_password_replace");
+  return await invokeCommand("request_admin_password_replace");
 }
 
 export async function completeAdminPasswordReplace(
   code: string,
   new_password: string,
 ): Promise<void> {
-  await invoke("complete_admin_password_replace", { code, newPassword: new_password });
+  await invokeCommand("complete_admin_password_replace", { code, newPassword: new_password });
 }
 
 export async function login(password: string): Promise<AuthResult> {
-  return await invoke("login", { password });
+  return await invokeCommand("login", { password });
 }
 
 export async function logout(session_token: string): Promise<void> {
   await invokeAuthed("logout", { sessionToken: session_token });
+}
+
+export async function auditTrailList(session_token: string): Promise<AuditEvent[]> {
+  return await invokeAuthed("audit_trail_list", { sessionToken: session_token });
 }
 
 export async function donorsList(session_token: string): Promise<Donor[]> {

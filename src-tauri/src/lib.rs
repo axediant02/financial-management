@@ -37,6 +37,7 @@ pub fn run() {
             commands::complete_admin_password_replace,
             commands::login,
             commands::logout,
+            commands::audit_trail_list,
             commands::donors_list,
             commands::donors_create,
             commands::donors_delete,
